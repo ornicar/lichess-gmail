@@ -10,13 +10,21 @@
     "128": "icons/icon128.png"
   },
   "background": {
-    "scripts": [
-      "src/bg/background.js"
-    ],
-    "persistent": false
+    "page": "src/bg/background.html",
+    "persistent": true
+  },
+  "options_page": "src/options/index.html",
+  "browser_action": {
+    "default_icon": "icons/icon19.png",
+    "default_title": "browser action demo",
+    "default_popup": "src/browser_action/browser_action.html"
   },
   "permissions": [
+    "clipboardRead",
     "clipboardWrite",
+    "contentSettings",
+    "contextMenus",
+    "tabs",
     "https://mail.google.com/mail/*"
   ],
   "content_scripts": [
@@ -24,7 +32,18 @@
       "matches": [
         "https://mail.google.com/mail/*"
       ],
+      "css": [
+        "src/inject/inject.css"
+      ]
+    },
+    {
+      "matches": [
+        "https://mail.google.com/mail/*"
+      ],
       "js": [
+        "src/inject/mousetrap.min.js",
+        "src/inject/jquery.min.js",
+        "src/inject/gmail.js",
         "src/inject/inject.js"
       ]
     }

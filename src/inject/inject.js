@@ -10,10 +10,14 @@ chrome.extension.sendMessage({}, function(response) {
 function load() {
   Mousetrap.bind('ctrl+i', function(e) {
     var email = getSenderEmail();
-    copyTextToClipboard(email); // in case needed for something else
+    // copyTextToClipboard(email); // in case needed for something else
     window.open('https://lichess.org/mod/email-confirm?q=' + email);
     setReply(canned.emailConfirmed);
     setReplyEmail('lichess.contact@gmail.com'); // contact@lichess.org might be blocked
+  });
+  Mousetrap.bind('ctrl+y', function(e) {
+    var email = getSenderEmail();
+    window.open('https://lichess.org/mod/search?q=' + email);
   });
 }
 

@@ -1,6 +1,14 @@
-//example of using a message handler from the inject scripts
-// chrome.extension.onMessage.addListener(
-//   function(request, sender, sendResponse) {
-//     chrome.pageAction.show(sender.tab.id);
-//     sendResponse();
-//   });
+function jumpToAccount(info,tab) {
+  var h = info.selectionText;
+  var m = h.match(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)*/i);
+  if (m) window.open("https://lichess.org/mod/search?q=" + encodeURIComponent(m[0]));
+  else {
+      m = h.match(/[a-z0-9][\w-]*[a-z0-9]/i);
+      if (m) window.open("https://lichess.org/@/" + m[0] + "?mod");
+  }
+}
+chrome.contextMenus.create({
+  title: "Lichess account", 
+  contexts:["selection"], 
+  onclick: jumpToAccount,
+});

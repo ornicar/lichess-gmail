@@ -15,3 +15,9 @@ For email confirmation requests. This shortcut:
 #### `Ctrl+y`
 
 Opens lichess search user page, with the sender email.
+
+#### Select text, right click menu
+
+Smart navigate:
+- If an email address is part of selection, open lichess email search
+- Else if a lichess account is part of selection, open mod page for account.

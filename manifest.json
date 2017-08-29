@@ -1,6 +1,6 @@
 {
   "name": "lichess contact email",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "manifest_version": 2,
   "description": "Tools to better support users through gmail",
   "homepage_url": "https://lichess.org",
@@ -10,14 +10,7 @@
     "128": "icons/icon128.png"
   },
   "background": {
-    "page": "src/bg/background.html",
-    "persistent": true
-  },
-  "options_page": "src/options/index.html",
-  "browser_action": {
-    "default_icon": "icons/icon19.png",
-    "default_title": "browser action demo",
-    "default_popup": "src/browser_action/browser_action.html"
+    "scripts": ["src/bg/background.js"]
   },
   "permissions": [
     "clipboardRead",
@@ -42,8 +35,6 @@
       ],
       "js": [
         "src/inject/mousetrap.min.js",
-        "src/inject/jquery.min.js",
-        "src/inject/gmail.js",
         "src/inject/inject.js"
       ]
     }

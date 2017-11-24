@@ -1,6 +1,12 @@
 ### Extra gmail features to better help lichess users
 
-Install as an unpacked chrome/firefox extension.
+#### Chrome
+
+Install as an unpacked extension.
+
+#### Firefox
+
+Install as a [temporary extension](https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Temporary_Installation_in_Firefox)
 
 ### Commands:
 

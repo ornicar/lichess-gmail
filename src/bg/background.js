@@ -7,7 +7,7 @@ function jumpToAccount(info,tab) {
       if (m) window.open("https://lichess.org/@/" + m[0] + "?mod");
   }
 }
-chrome.contextMenus.create({
+browser.contextMenus.create({
   title: "Lichess account", 
   contexts:["selection"], 
   onclick: jumpToAccount,

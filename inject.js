@@ -1,24 +1,30 @@
-browser.extension.sendMessage({}, function(response) {
-  var readyStateCheckInterval = setInterval(function() {
-    if (document.readyState === "complete") {
-      clearInterval(readyStateCheckInterval);
-      load();
-    }
-  }, 100);
-});
+// browser.extension.sendMessage({}, function(response) {
+//   var readyStateCheckInterval = setInterval(function() {
+//     if (document.readyState === "complete") {
+//       clearInterval(readyStateCheckInterval);
+//       load();
+//     }
+//   }, 100);
+// });
 
 function load() {
-  Mousetrap.bind('ctrl+i', function(e) {
+  Mousetrap.bind('ctrl+,', function(e) {
     var email = getSenderEmail();
     // copyTextToClipboard(email); // in case needed for something else
-    window.open('https://lichess.org/mod/email-confirm?q=' + email);
+    openUrl('https://lichess.org/mod/email-confirm?q=' + email);
     setReply(canned.emailConfirmed);
     setReplyEmail('lichess.contact@gmail.com'); // contact@lichess.org might be blocked
   });
   Mousetrap.bind('ctrl+y', function(e) {
     var email = getSenderEmail();
-    window.open('https://lichess.org/mod/search?q=' + email);
+    openUrl('https://lichess.org/mod/search?q=' + email);
   });
+}
+load();
+
+function openUrl(url) {
+  // console.log('Opening ' + url);
+  window.open(url);
 }
 
 function getSenderEmail() {

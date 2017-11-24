@@ -4,7 +4,7 @@ Install as an unpacked chrome/firefox extension.
 
 ### Commands:
 
-#### `Ctrl+i`
+#### `Ctrl+,`
 
 For email confirmation requests. This shortcut:
 

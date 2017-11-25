@@ -2,7 +2,7 @@
 
 #### Chrome
 
-Install as an unpacked extension.
+Install [here](https://chrome.google.com/webstore/detail/lichess-contact-email/hflokhbdmmfmfbicogohbkkkcmmbppja) or as an unpacked extension.
 
 #### Firefox
 

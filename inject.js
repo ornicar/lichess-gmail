@@ -8,13 +8,18 @@
 // });
 
 function load() {
-  Mousetrap.bind('ctrl+,', function(e) {
+  function confirmEmail(e) {
     var email = getSenderEmail();
     // copyTextToClipboard(email); // in case needed for something else
     openUrl('https://lichess.org/mod/email-confirm?q=' + email);
-    setReply(canned.emailConfirmed);
-    setReplyEmail('lichess.contact@gmail.com'); // contact@lichess.org might be blocked
-  });
+    clickReply();
+    setTimeout(() => {
+      setReply(canned.emailConfirmed);
+      setReplyEmail('lichess.contact@gmail.com'); // contact@lichess.org might be blocked
+    }, 100);
+  }
+  Mousetrap.bind('ctrl+,', confirmEmail);
+  Mousetrap.bind('ctrl+f', confirmEmail);
   Mousetrap.bind('ctrl+y', function(e) {
     var email = getSenderEmail();
     openUrl('https://lichess.org/mod/search?q=' + email);
@@ -36,7 +41,6 @@ function clickReply() {
 }
 
 function setReply(html) {
-  clickReply();
   document.querySelector('div.editable[id][contenteditable][g_editable]').innerHTML = html;
 }
 

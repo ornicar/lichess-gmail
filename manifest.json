@@ -1,6 +1,6 @@
 {
   "name": "lichess contact email",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "manifest_version": 2,
   "description": "Tools to better support users through gmail",
   "homepage_url": "https://lichess.org",
@@ -23,9 +23,6 @@
     {
       "matches": [
         "https://mail.google.com/mail/*"
-      ],
-      "css": [
-        "inject.css"
       ],
       "js": [
         "mousetrap.min.js",

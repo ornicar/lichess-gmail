@@ -6,7 +6,7 @@ Install [here](https://chrome.google.com/webstore/detail/lichess-contact-email/h
 
 #### Firefox
 
-Install as a [temporary extension](https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Temporary_Installation_in_Firefox)
+Install the [Firefox extension](https://addons.mozilla.org/en-US/firefox/addon/lichess-contact-email/).
 
 ### Commands:
 

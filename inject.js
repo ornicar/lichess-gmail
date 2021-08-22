@@ -20,7 +20,7 @@ function load() {
   }
   Mousetrap.bind('ctrl+,', confirmEmail);
   Mousetrap.bind('ctrl+f', confirmEmail);
-  Mousetrap.bind('ctrl+y', function(e) {
+  Mousetrap.bind('ctrl+y', function (e) {
     var email = getSenderEmail();
     openUrl('https://lichess.org/mod/search?q=' + email);
   });
@@ -33,7 +33,8 @@ function openUrl(url) {
 }
 
 function getSenderEmail() {
-  return document.querySelector('img.ajn[jid]').getAttribute('jid');
+  return document.querySelector('tr.acZ span[email]').getAttribute('email');
+  // return document.querySelector('img.ajn[jid]').getAttribute('jid');
 }
 
 function clickReply() {
@@ -45,17 +46,19 @@ function setReply(html) {
 }
 
 function setReplyEmail(email) {
-  var el = Array.from(document.querySelectorAll('form span')).find(o => o.textContent === 'Lichess Contact <contact@lichess.org>');
+  var el = Array.from(document.querySelectorAll('form span')).find(
+    o => o.textContent === 'Lichess Contact <contact@lichess.org>'
+  );
   if (el) el.innerHTML = email;
 }
 
 var canned = {
-  emailConfirmed: '<div dir="ltr"><div>Hi,</div><div><br></div><div>We have confirmed your email address. You should now be able to login on <a href="https://lichess.org/login" target="_blank" data-saferedirecturl="https://www.google.com/url?hl=en&amp;q=https://lichess.org/login&amp;source=gmail&amp;ust=1502980246998000&amp;usg=AFQjCNHZF7-3y2USLf1bCPOp22Kbk6MQqA">https://lichess.org/login</a><br></div><div><br></div><div><br></div><div>--&nbsp;</div><div>Regards,</div><div>Lichess mod team</div></div>'
+  emailConfirmed:
+    '<div dir="ltr"><div>Hi,</div><div><br></div><div>We have confirmed your email address. You should now be able to login on <a href="https://lichess.org/login" target="_blank" data-saferedirecturl="https://www.google.com/url?hl=en&amp;q=https://lichess.org/login&amp;source=gmail&amp;ust=1502980246998000&amp;usg=AFQjCNHZF7-3y2USLf1bCPOp22Kbk6MQqA">https://lichess.org/login</a><br></div><div><br></div><div><br></div><div>--&nbsp;</div><div>Regards,</div><div>Lichess mod team</div></div>',
 };
 
 // <https://stackoverflow.com/a/17644403>
 function copyTextToClipboard(html) {
-
   var tmpNode = document.createElement('div');
   tmpNode.innerHTML = html;
   document.body.appendChild(tmpNode);

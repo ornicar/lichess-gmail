@@ -1,12 +1,12 @@
 ### Extra gmail features to better help lichess users
 
-#### Chrome
+#### Installation
 
-Install [here](https://chrome.google.com/webstore/detail/lichess-contact-email/hflokhbdmmfmfbicogohbkkkcmmbppja) or as an unpacked extension.
-
-#### Firefox
-
-Install the [Firefox extension](https://addons.mozilla.org/en-US/firefox/addon/lichess-contact-email/).
+- Download the extension zip: https://github.com/ornicar/lichess-gmail/archive/refs/heads/master.zip.
+- Unzip it somewhere.
+- Open chrome://extensions/ in your browser.
+- Remove the previous version if any.
+- Click "Load unpacked" and select the unzipped folder.
 
 ### Commands:
 
@@ -25,5 +25,6 @@ Opens lichess search user page, with the sender email.
 #### Select text, right click menu
 
 Smart navigate:
+
 - If an email address is part of selection, open lichess email search
 - Else if a lichess account is part of selection, open mod page for account.

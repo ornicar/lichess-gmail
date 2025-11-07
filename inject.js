@@ -20,7 +20,7 @@ function load() {
   }
   Mousetrap.bind('ctrl+,', confirmEmail);
   Mousetrap.bind('ctrl+f', confirmEmail);
-  Mousetrap.bind('ctrl+y', function (e) {
+  Mousetrap.bind('ctrl+y', function(e) {
     var email = getSenderEmail();
     openUrl('https://lichess.org/mod/search?q=' + email);
   });
@@ -38,7 +38,7 @@ function getSenderEmail() {
 }
 
 function clickReply() {
-  document.querySelector('span.ams.bkH').click();
+  document.querySelector('table[role=presentation] button span[jsname][aria-hidden=true]').click();
 }
 
 function setReply(html) {

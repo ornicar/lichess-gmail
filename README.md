@@ -6,6 +6,7 @@
 - Unzip it somewhere.
 - Open chrome://extensions/ in your browser.
 - Remove the previous version if any.
+- Ensure "Developer mode" is toggled on in the top right.
 - Click "Load unpacked" and select the unzipped folder.
 
 ### Commands:

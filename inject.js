@@ -38,7 +38,7 @@ function getSenderEmail() {
 }
 
 function clickReply() {
-  document.querySelector('table[role=presentation] button span[jsname][aria-hidden=true]').click();
+  document.querySelector('button[aria-label=Reply] span[jsname][aria-hidden=true]').click();
 }
 
 function setReply(html) {

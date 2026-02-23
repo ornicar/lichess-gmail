@@ -7,10 +7,15 @@
 - Open chrome://extensions/ in your browser.
 - Remove the previous version if any.
 - Click "Load unpacked" and select the unzipped folder.
+- Configure your signature in the extension options: click the extension icon in your toolbar then "Options".
 
 ### Commands:
 
-#### `Ctrl+,`
+#### `Ctrl+Shift+E`
+
+Inserts your configured email signature at the cursor in the current email text area.
+
+#### `Ctrl+,` or `Ctrl+F`
 
 For email confirmation requests. This shortcut:
 

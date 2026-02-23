@@ -1,35 +1,28 @@
 {
-  "name": "lichess contact email",
+  "name": "Lichess Gmail Tools",
   "version": "0.1",
   "manifest_version": 3,
   "description": "Tools to better support users through gmail",
   "homepage_url": "https://lichess.org",
+  "options_ui": { "page": "options.html" },
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "background": {
-    "scripts": [
-      "src/bg/background.js"
-    ]
-  },
+  "background": { "scripts": ["src/bg/background.js"] },
   "permissions": [
     "clipboardRead",
     "clipboardWrite",
     "contextMenus",
+    "storage",
     "tabs",
     "https://mail.google.com/mail/*"
   ],
   "content_scripts": [
     {
-      "matches": [
-        "https://mail.google.com/mail/*"
-      ],
-      "js": [
-        "mousetrap.min.js",
-        "inject.js"
-      ]
+      "matches": ["https://mail.google.com/mail/*"],
+      "js": ["mousetrap.min.js", "inject.js"]
     }
   ]
 }

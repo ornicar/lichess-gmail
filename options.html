@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Lichess Gmail – Settings</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 560px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+      color: #333;
+    }
+    h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+    p { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
+    label { display: block; font-weight: 500; margin-bottom: 0.25rem; }
+    textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 0.5rem;
+      font-family: inherit;
+      font-size: 0.9rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    button {
+      background: #3893e8;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    button:hover { background: #2d7ed3; }
+    .status { margin-top: 0.75rem; font-size: 0.85rem; }
+    .success { color: #0a7; }
+  </style>
+</head>
+<body>
+  <h1>Lichess Gmail Settings</h1>
+  <p>Customize the signature used in the email confirmation response (Ctrl+, / Ctrl+f).</p>
+  <label for="signature">Custom signature</label>
+  <textarea id="signature" placeholder="--&#10;Regards,&#10;Lichess mod team"></textarea>
+  <button id="save">Save</button>
+  <div id="status" class="status"></div>
+  <script src="options.js"></script>
+</body>
+</html>

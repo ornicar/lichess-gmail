@@ -10,14 +10,24 @@
 function load() {
   function confirmEmail(e) {
     var email = getSenderEmail();
-    // copyTextToClipboard(email); // in case needed for something else
     openUrl('https://lichess.org/mod/email-confirm?q=' + email);
     clickReply();
-    setTimeout(() => {
-      setReply(canned.emailConfirmed);
-      setReplyEmail('lichess.contact@gmail.com'); // contact@lichess.org might be blocked
-    }, 100);
+    var storage = (typeof chrome !== 'undefined' && chrome.storage) ? chrome.storage : browser.storage;
+    storage.sync.get(['customSignature'], function(data) {
+      var html = buildEmailConfirmedHtml(data.customSignature);
+      setTimeout(function() {
+        setReply(html);
+        setReplyEmail('lichess.contact@gmail.com');
+      }, 100);
+    });
   }
+  Mousetrap.bind('ctrl+shift+e', function(e) {
+    e.preventDefault();
+    var storage = (typeof chrome !== 'undefined' && chrome.storage) ? chrome.storage : browser.storage;
+    storage.sync.get(['customSignature'], function(data) {
+      insertSignature(signatureToHtml(data.customSignature));
+    });
+  });
   Mousetrap.bind('ctrl+,', confirmEmail);
   Mousetrap.bind('ctrl+f', confirmEmail);
   Mousetrap.bind('ctrl+y', function(e) {
@@ -45,6 +55,16 @@ function setReply(html) {
   document.querySelector('div.editable[id][contenteditable][g_editable]').innerHTML = html;
 }
 
+function insertSignature(html) {
+  var editable = document.activeElement && document.activeElement.closest
+    ? document.activeElement.closest('div[contenteditable="true"]')
+    : null;
+  if (!editable) editable = document.querySelector('div.editable[id][contenteditable][g_editable]');
+  if (!editable) return;
+  editable.focus();
+  document.execCommand('insertHTML', false, html);
+}
+
 function setReplyEmail(email) {
   var el = Array.from(document.querySelectorAll('form span')).find(
     o => o.textContent === 'Lichess Contact <contact@lichess.org>'
@@ -52,10 +72,27 @@ function setReplyEmail(email) {
   if (el) el.innerHTML = email;
 }
 
-var canned = {
-  emailConfirmed:
-    '<div dir="ltr"><div>Hi,</div><div><br></div><div>We have confirmed your email address. You should now be able to login on <a href="https://lichess.org/login" target="_blank" data-saferedirecturl="https://www.google.com/url?hl=en&amp;q=https://lichess.org/login&amp;source=gmail&amp;ust=1502980246998000&amp;usg=AFQjCNHZF7-3y2USLf1bCPOp22Kbk6MQqA">https://lichess.org/login</a><br></div><div><br></div><div><br></div><div>--&nbsp;</div><div>Regards,</div><div>Lichess mod team</div></div>',
-};
+var DEFAULT_SIGNATURE = '--\nRegards,\nLichess mod team';
+
+var emailConfirmedBody = '<div dir="ltr"><div>Hi,</div><div><br></div><div>We have confirmed your email address. You should now be able to login on <a href="https://lichess.org/login" target="_blank" data-saferedirecturl="https://www.google.com/url?hl=en&amp;q=https://lichess.org/login&amp;source=gmail&amp;ust=1502980246998000&amp;usg=AFQjCNHZF7-3y2USLf1bCPOp22Kbk6MQqA">https://lichess.org/login</a><br></div><div></div><div><br></div>';
+
+function signatureToHtml(signature) {
+  var lines = (signature || DEFAULT_SIGNATURE).split(/\r?\n/);
+  return lines.map(function(line) {
+    if (line === '--') return '<div>--&nbsp;</div>';
+    return '<div>' + escapeHtml(line) + '</div>';
+  }).join('');
+}
+
+function escapeHtml(text) {
+  var div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function buildEmailConfirmedHtml(customSignature) {
+  return emailConfirmedBody + signatureToHtml(customSignature) + '</div>';
+}
 
 // <https://stackoverflow.com/a/17644403>
 function copyTextToClipboard(html) {

@@ -5,7 +5,7 @@
   var saveBtn = document.getElementById('save');
   var status = document.getElementById('status');
 
-  var storage = (typeof chrome !== 'undefined' && chrome.storage) ? chrome.storage : browser.storage;
+  var storage = (typeof chrome !== 'undefined' && chrome.storage ? chrome : browser).storage;
 
   function showStatus(msg, isSuccess) {
     status.textContent = msg;

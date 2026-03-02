@@ -1,23 +1,25 @@
 {
   "name": "Lichess Gmail Tools",
   "version": "0.1",
-  "manifest_version": 2,
+  "manifest_version": 3,
   "description": "Tools to better support users through gmail",
   "homepage_url": "https://lichess.org",
   "browser_specific_settings": {
     "gecko": {
       "id": "lichess-gmail@lichess.org",
-      "strict_min_version": "109.0"
+      "strict_min_version": "121.0"
     }
   },
   "options_ui": { "page": "options.html" },
-  "options_page": "options.html",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "background": { "scripts": ["src/bg/background.js"] },
+  "background": {
+    "scripts": ["src/bg/background.js"],
+    "service_worker": "src/bg/background.js"
+  },
   "permissions": [
     "clipboardRead",
     "clipboardWrite",

@@ -11,7 +11,7 @@
 - Configure your signature in the extension options: click the extension icon in your toolbar then "Options".
 
 **Firefox**
-- Same steps as Chrome, but open `about:debugging`, click "This Firefox", then "Load Temporary Add-on" and select the `manifest.json` file from the unzipped folder.
+- Same steps as Chrome, but open `about:debugging`, click "This Firefox", then "Load Temporary Add-on" and select the `manifest.json` file from the unzipped folder. Requires Firefox 121 or later.
 - To configure your signature: open `about:addons`, find "Lichess Gmail Tools", click the gear icon, then "Preferences" (or "Manage Extension" → "Preferences").
 
 ### Commands:

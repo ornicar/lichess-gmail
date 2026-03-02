@@ -72,7 +72,7 @@ function setReplyEmail(email) {
   if (el) el.innerHTML = email;
 }
 
-var DEFAULT_SIGNATURE = '--\nRegards,\nLichess mod team';
+var DEFAULT_SIGNATURE = '--\nRegards,\nLichess team';
 
 var emailConfirmedBody = '<div dir="ltr"><div>Hi,</div><div><br></div><div>We have confirmed your email address. You should now be able to login on <a href="https://lichess.org/login" target="_blank" data-saferedirecturl="https://www.google.com/url?hl=en&amp;q=https://lichess.org/login&amp;source=gmail&amp;ust=1502980246998000&amp;usg=AFQjCNHZF7-3y2USLf1bCPOp22Kbk6MQqA">https://lichess.org/login</a><br></div><div></div><div><br></div>';
 

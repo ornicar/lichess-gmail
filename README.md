@@ -2,12 +2,16 @@
 
 #### Installation
 
+**Chrome**
 - Download the extension zip: https://github.com/ornicar/lichess-gmail/archive/refs/heads/master.zip.
 - Unzip it somewhere.
-- Open chrome://extensions/ in your browser.
+- Open `chrome://extensions/` in your browser.
 - Remove the previous version if any.
 - Click "Load unpacked" and select the unzipped folder.
 - Configure your signature in the extension options: click the extension icon in your toolbar then "Options".
+
+**Firefox**
+- Same steps as Chrome, but open `about:debugging`, click "This Firefox", then "Load Temporary Add-on" and select the `manifest.json` file from the unzipped folder.
 
 ### Commands:
 

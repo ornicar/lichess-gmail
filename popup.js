@@ -4,12 +4,12 @@
   var signature = document.getElementById('signature');
   var saveBtn = document.getElementById('save');
   var status = document.getElementById('status');
+  var optionsLink = document.getElementById('options-link');
 
   var storage = (typeof chrome !== 'undefined' && chrome.storage ? chrome : browser).storage;
 
-  function showStatus(msg, isSuccess) {
+  function showStatus(msg) {
     status.textContent = msg;
-    status.className = 'status' + (isSuccess ? ' success' : '');
     setTimeout(function() { status.textContent = ''; }, 2000);
   }
 
@@ -19,7 +19,13 @@
 
   saveBtn.addEventListener('click', function() {
     storage.sync.set({ customSignature: signature.value }, function() {
-      showStatus('Settings saved.', true);
+      showStatus('Saved');
     });
+  });
+
+  optionsLink.addEventListener('click', function(e) {
+    e.preventDefault();
+    var ext = typeof chrome !== 'undefined' && chrome.runtime ? chrome : browser;
+    ext.runtime.openOptionsPage && ext.runtime.openOptionsPage();
   });
 })();

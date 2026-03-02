@@ -1,13 +1,18 @@
-### Extra gmail features to better help lichess users
+### Extra Gmail tools for Lichess team members
 
 #### Installation
 
+**Chrome**
 - Download the extension zip: https://github.com/ornicar/lichess-gmail/archive/refs/heads/master.zip.
 - Unzip it somewhere.
-- Open chrome://extensions/ in your browser.
+- Open `chrome://extensions/` in your browser.
 - Remove the previous version if any.
 - Click "Load unpacked" and select the unzipped folder.
-- Configure your signature in the extension options: click the extension icon in your toolbar then "Options".
+- To configure your signature: click the extension icon in your toolbar to open the popup.
+
+**Firefox**
+- Same steps as Chrome, but open `about:debugging`, click "This Firefox", then "Load Temporary Add-on" and select the `manifest.json` file from the unzipped folder.
+- To configure your signature: click the extension icon in the toolbar to open the popup.
 
 ### Commands:
 

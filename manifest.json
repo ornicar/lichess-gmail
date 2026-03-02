@@ -10,6 +10,10 @@
       "strict_min_version": "121.0"
     }
   },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Lichess Gmail Tools"
+  },
   "options_ui": { "page": "options.html" },
   "icons": {
     "16": "icons/icon16.png",

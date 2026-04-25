@@ -35,26 +35,96 @@ function load() {
 }
 
 /**
- * Injected “Hermes” button: we only touch our own node (no Gmail DOM selectors) and
- * use a shadow root so Gmail’s stylesheets can’t clobber the button. Fixed top–center
- * of the viewport so it stays put while mail UI scrolls.
+ * Heuristic for an open message thread, based only on the location fragment (not Gmail
+ * HTML). Typical pattern: #label_or_box/threadId with a long opaque id as the last
+ * segment. Short two-segment paths (e.g. #search/term) are mostly excluded by length.
  */
-function injectHermesButton() {
-  var id = 'lichess-gmail-hermes-host';
-  if (document.getElementById(id)) return;
+function isGmailThreadViewFromUrl() {
+  var h = (location.hash || '').replace(/^#/, '');
+  if (!h) return false;
+  var parts = h.split('/').map(function (p) {
+    try { return decodeURIComponent(p); } catch (e) { return p; }
+  });
+  if (parts.length < 2) return false;
+  var last = (parts[parts.length - 1] || '').trim();
+  if (last.length < 8) return false;
+  if (!/^[0-9A-Za-z_\-+]+$/.test(last)) return false;
+  if (/^(compose|p\d+)$/i.test(last)) return false;
+  return true;
+}
+
+/**
+ * Injected “Hermes” top button + thread dock. We only touch our own host nodes, use
+ * shadow roots, and do not look for a “thread root” in the page. The dock is fixed to
+ * the bottom of the viewport (not inline after the last message) so it survives Gmail
+ * layout changes; visually it’s still a bottom strip in the message context.
+ */
+function initHermesUi() {
+  var hermesHostId = 'lichess-gmail-hermes-host';
+  var dockHostId = 'lichess-gmail-hermes-dock';
+  if (document.getElementById(hermesHostId)) return;
+
+  var hermesEnabled = false;
+  var urlPollId = null;
+  var lastSeenUrl = location.href;
+
+  function stopUrlPoll() {
+    if (urlPollId != null) {
+      clearInterval(urlPollId);
+      urlPollId = null;
+    }
+  }
+
+  function onLocationMaybeChanged() {
+    if (location.href === lastSeenUrl) return;
+    lastSeenUrl = location.href;
+    updateThreadDock();
+  }
+
+  function startUrlPoll() {
+    if (urlPollId != null) return;
+    urlPollId = setInterval(onLocationMaybeChanged, 900);
+  }
+
+  function updateThreadDock() {
+    var dock = document.getElementById(dockHostId);
+    if (!dock) return;
+    var on = hermesEnabled && isGmailThreadViewFromUrl();
+    dock.style.display = on ? 'block' : 'none';
+    dock.setAttribute('aria-hidden', on ? 'false' : 'true');
+  }
+
+  function setHermesEnabled(next) {
+    hermesEnabled = next;
+    lastSeenUrl = location.href;
+    var h = document.getElementById(hermesHostId);
+    if (h && h.shadowRoot) {
+      var b = h.shadowRoot.querySelector('button');
+      if (b) b.setAttribute('aria-pressed', hermesEnabled ? 'true' : 'false');
+      h.style.display = hermesEnabled ? 'none' : 'block';
+      h.setAttribute('aria-hidden', hermesEnabled ? 'true' : 'false');
+    }
+    if (hermesEnabled) startUrlPoll();
+    else stopUrlPoll();
+    updateThreadDock();
+  }
+
+  function onHermesClick() {
+    setHermesEnabled(!hermesEnabled);
+  }
 
   function mount() {
-    if (document.getElementById(id)) return;
-    var host = document.createElement('div');
-    host.id = id;
-    host.setAttribute('data-lichess-gmail', 'hermes');
-    host.style.cssText = [
+    if (document.getElementById(hermesHostId)) return;
+
+    var hermesHost = document.createElement('div');
+    hermesHost.id = hermesHostId;
+    hermesHost.setAttribute('data-lichess-gmail', 'hermes');
+    hermesHost.style.cssText = [
       'box-sizing: border-box',
       'position: fixed',
       'z-index: 2147483647',
-      'top: 0',
-      'left: 50%',
-      'transform: translateX(-50%)',
+      'bottom: 0',
+      'right: 0',
       'margin: 0',
       'padding: 0',
       'border: 0',
@@ -62,32 +132,115 @@ function injectHermesButton() {
       'pointer-events: auto'
     ].join('; ');
 
-    var root = host.attachShadow({ mode: 'open' });
-    var style = document.createElement('style');
-    style.textContent = [
+    var hRoot = hermesHost.attachShadow({ mode: 'open' });
+    var hStyle = document.createElement('style');
+    hStyle.textContent = [
       ':host { display: block; }',
       'button {',
       '  font: 12px/1.2 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;',
-      '  margin: 8px 0 0;',
+      '  margin: 0 8px 8px 0;',
       '  padding: 6px 12px;',
       '  color: #202124;',
       '  background: #fff;',
       '  border: 1px solid rgba(60,64,67,0.28);',
       '  border-radius: 6px;',
       '  box-shadow: 0 1px 2px rgba(60,64,67,0.15), 0 1px 1px rgba(60,64,67,0.1);',
+      '  cursor: pointer;',
+      '  user-select: none;',
+      '  -webkit-user-select: none;',
+      '}',
+      'button[aria-pressed="true"] {',
+      '  background: #e8f0fe;',
+      '  border-color: #1a73e8;',
+      '  color: #1967d2;',
+      '}'
+    ].join('\n');
+    var hermesBtn = document.createElement('button');
+    hermesBtn.type = 'button';
+    hermesBtn.setAttribute('aria-label', 'Hermes');
+    hermesBtn.setAttribute('aria-pressed', 'false');
+    hermesBtn.setAttribute('title', 'Turn Hermes message tools on or off');
+    hermesBtn.appendChild(document.createTextNode('Hermes'));
+    hermesBtn.addEventListener('click', onHermesClick);
+
+    hRoot.appendChild(hStyle);
+    hRoot.appendChild(hermesBtn);
+
+    var dockHost = document.createElement('div');
+    dockHost.id = dockHostId;
+    dockHost.setAttribute('data-lichess-gmail', 'hermes-dock');
+    dockHost.setAttribute('role', 'region');
+    dockHost.setAttribute('aria-label', 'Hermes thread tools');
+    dockHost.setAttribute('aria-hidden', 'true');
+    dockHost.style.cssText = [
+      'box-sizing: border-box',
+      'position: fixed',
+      'z-index: 2147483646',
+      'left: 0',
+      'right: 0',
+      'bottom: 0',
+      'display: none',
+      'margin: 0',
+      'padding: 0',
+      'border: 0',
+      'background: transparent',
+      'pointer-events: auto'
+    ].join('; ');
+
+    var dRoot = dockHost.attachShadow({ mode: 'open' });
+    var dStyle = document.createElement('style');
+    dStyle.textContent = [
+      ':host {',
+      '  display: block;',
+      '  font: 12px/1.2 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;',
+      '  color: #202124;',
+      '}',
+      '.row {',
+      '  display: flex;',
+      '  flex-direction: row;',
+      '  flex-wrap: wrap;',
+      '  justify-content: center;',
+      '  align-items: center;',
+      '  gap: 8px;',
+      '  box-sizing: border-box;',
+      '  width: 100%;',
+      '  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));',
+      '  background: #fff;',
+      '  border-top: 1px solid rgba(60,64,67,0.2);',
+      '  box-shadow: 0 -1px 4px rgba(60,64,67,0.12);',
+      '}',
+      'button {',
+      '  font: inherit;',
+      '  line-height: 1.2;',
+      '  min-height: 32px;',
+      '  padding: 0 12px;',
+      '  color: #202124;',
+      '  background: #f1f3f4;',
+      '  border: 1px solid rgba(60,64,67,0.2);',
+      '  border-radius: 4px;',
       '  cursor: default;',
       '  user-select: none;',
       '  -webkit-user-select: none;',
       '}'
     ].join('\n');
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.setAttribute('aria-label', 'Hermes');
-    btn.appendChild(document.createTextNode('Hermes'));
+    var row = document.createElement('div');
+    row.className = 'row';
+    for (var i = 0; i < 3; i += 1) {
+      var mb = document.createElement('button');
+      mb.type = 'button';
+      mb.setAttribute('aria-label', 'Mock ' + (i + 1));
+      mb.appendChild(document.createTextNode('Mock ' + (i + 1)));
+      row.appendChild(mb);
+    }
 
-    root.appendChild(style);
-    root.appendChild(btn);
-    (document.body || document.documentElement).appendChild(host);
+    dRoot.appendChild(dStyle);
+    dRoot.appendChild(row);
+
+    (document.body || document.documentElement).appendChild(hermesHost);
+    (document.body || document.documentElement).appendChild(dockHost);
+
+    window.addEventListener('hashchange', onLocationMaybeChanged, false);
+    window.addEventListener('popstate', onLocationMaybeChanged, false);
   }
 
   if (document.body) mount();
@@ -95,7 +248,7 @@ function injectHermesButton() {
 }
 
 load();
-injectHermesButton();
+initHermesUi();
 
 function openUrl(url) {
   // console.log('Opening ' + url);

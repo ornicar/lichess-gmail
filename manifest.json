@@ -34,7 +34,7 @@
   "content_scripts": [
     {
       "matches": ["https://mail.google.com/mail/*"],
-      "js": ["mousetrap.min.js", "inject.js"]
+      "js": ["mousetrap.min.js", "common.js", "inject.js"]
     }
   ]
 }

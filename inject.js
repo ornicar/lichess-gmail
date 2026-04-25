@@ -1,12 +1,3 @@
-// browser.extension.sendMessage({}, function(response) {
-//   var readyStateCheckInterval = setInterval(function() {
-//     if (document.readyState === "complete") {
-//       clearInterval(readyStateCheckInterval);
-//       load();
-//     }
-//   }, 100);
-// });
-
 function load() {
   function confirmEmail(e) {
     var email = getSenderEmail();
@@ -62,11 +53,17 @@ function isGmailThreadViewFromUrl() {
 function initHermesUi() {
   var hermesHostId = 'lichess-gmail-hermes-host';
   var dockHostId = 'lichess-gmail-hermes-dock';
+  var templatesApiUrl = 'https://hermes.lichess.app/api/templates';
+  var templatesRefreshMs = 6 * 60 * 60 * 1000; // 6 hours
   if (document.getElementById(hermesHostId)) return;
 
   var hermesEnabled = false;
   var urlPollId = null;
+  var templatesRefreshId = null;
   var lastSeenUrl = location.href;
+  var templates = [];
+  var templatesLoaded = false;
+  var templatesLoadError = false;
 
   function stopUrlPoll() {
     if (urlPollId != null) {
@@ -84,6 +81,150 @@ function initHermesUi() {
   function startUrlPoll() {
     if (urlPollId != null) return;
     urlPollId = setInterval(onLocationMaybeChanged, 900);
+  }
+
+  function getReplyEditable() {
+    return document.querySelector('div.editable[id][contenteditable][g_editable]');
+  }
+
+  function withSignatureIfNeeded(template, done) {
+    var body = (template && typeof template.body === 'string') ? template.body : '';
+    if (!template || !template.appendSignature) {
+      done(body);
+      return;
+    }
+    extensionStorage().sync.get([SIGNATURE_STORAGE_KEY], function(data) {
+      var signatureHtml = signatureToHtml(data[SIGNATURE_STORAGE_KEY]);
+      done(body + signatureHtml);
+    });
+  }
+
+  function applyTemplateHtmlToReply(template) {
+    withSignatureIfNeeded(template, function(html) {
+      var editable = getReplyEditable();
+      if (editable) {
+        setReply(html);
+        return;
+      }
+
+      clickReply();
+      var attemptsLeft = 40;
+      var timer = setInterval(function() {
+        var nextEditable = getReplyEditable();
+        if (nextEditable) {
+          clearInterval(timer);
+          setReply(html);
+          return;
+        }
+        attemptsLeft -= 1;
+        if (attemptsLeft <= 0) clearInterval(timer);
+      }, 100);
+    });
+  }
+
+  function getDockRow() {
+    var dock = document.getElementById(dockHostId);
+    if (!dock || !dock.shadowRoot) return null;
+    return dock.shadowRoot.querySelector('.row');
+  }
+
+  function appendUtilityButtons(row) {
+    var reload = document.createElement('button');
+    reload.type = 'button';
+    reload.className = 'utility';
+    reload.setAttribute('aria-label', 'Reload templates');
+    reload.appendChild(document.createTextNode('Reload'));
+    reload.addEventListener('click', function() {
+      templatesLoaded = false;
+      templatesLoadError = false;
+      renderTemplateButtons();
+      fetchTemplatesAndRender();
+    });
+    row.appendChild(reload);
+
+    var edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'utility';
+    edit.setAttribute('aria-label', 'Edit templates');
+    edit.appendChild(document.createTextNode('Edit templates'));
+    edit.addEventListener('click', function() {
+      window.open('https://hermes.lichess.app', '_blank', 'noopener,noreferrer');
+    });
+    row.appendChild(edit);
+  }
+
+  function renderTemplateButtons() {
+    var row = getDockRow();
+    if (!row) return;
+    while (row.firstChild) row.removeChild(row.firstChild);
+
+    if (!templatesLoaded && !templatesLoadError) {
+      var loading = document.createElement('span');
+      loading.className = 'status';
+      loading.appendChild(document.createTextNode('Loading templates...'));
+      row.appendChild(loading);
+      appendUtilityButtons(row);
+      return;
+    }
+
+    if (templatesLoadError) {
+      var error = document.createElement('span');
+      error.className = 'status';
+      error.appendChild(document.createTextNode('Could not load templates'));
+      row.appendChild(error);
+      appendUtilityButtons(row);
+      return;
+    }
+
+    if (!templates.length) {
+      var empty = document.createElement('span');
+      empty.className = 'status';
+      empty.appendChild(document.createTextNode('No templates available'));
+      row.appendChild(empty);
+      appendUtilityButtons(row);
+      return;
+    }
+
+    templates.forEach(function(template) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      var name = (template && typeof template.name === 'string' && template.name.trim())
+        ? template.name.trim()
+        : ('Template ' + String(template && template.id != null ? template.id : ''));
+      b.setAttribute('aria-label', name);
+      b.appendChild(document.createTextNode(name));
+      b.addEventListener('click', function() {
+        applyTemplateHtmlToReply(template);
+      });
+      row.appendChild(b);
+    });
+
+    appendUtilityButtons(row);
+  }
+
+  function fetchTemplatesAndRender() {
+    return fetch(templatesApiUrl)
+      .then(function(res) {
+        if (!res.ok) throw new Error('Bad status ' + res.status);
+        return res.json();
+      })
+      .then(function(payload) {
+        var next = payload && Array.isArray(payload.templates) ? payload.templates : [];
+        templates = next;
+        templatesLoaded = true;
+        templatesLoadError = false;
+        renderTemplateButtons();
+      })
+      .catch(function() {
+        templatesLoaded = true;
+        templatesLoadError = true;
+        renderTemplateButtons();
+      });
+  }
+
+  function startTemplatesRefreshLoop() {
+    if (templatesRefreshId != null) return;
+    templatesRefreshId = setInterval(fetchTemplatesAndRender, templatesRefreshMs);
   }
 
   function updateThreadDock() {
@@ -221,17 +362,22 @@ function initHermesUi() {
       '  cursor: default;',
       '  user-select: none;',
       '  -webkit-user-select: none;',
+      '}',
+      'button.utility {',
+      '  background: #fff;',
+      '}',
+      '.status {',
+      '  color: #5f6368;',
+      '  font-size: 12px;',
+      '  padding: 0 4px;',
       '}'
     ].join('\n');
     var row = document.createElement('div');
     row.className = 'row';
-    for (var i = 0; i < 3; i += 1) {
-      var mb = document.createElement('button');
-      mb.type = 'button';
-      mb.setAttribute('aria-label', 'Mock ' + (i + 1));
-      mb.appendChild(document.createTextNode('Mock ' + (i + 1)));
-      row.appendChild(mb);
-    }
+    var loading = document.createElement('span');
+    loading.className = 'status';
+    loading.appendChild(document.createTextNode('Loading templates...'));
+    row.appendChild(loading);
 
     dRoot.appendChild(dStyle);
     dRoot.appendChild(row);
@@ -241,6 +387,10 @@ function initHermesUi() {
 
     window.addEventListener('hashchange', onLocationMaybeChanged, false);
     window.addEventListener('popstate', onLocationMaybeChanged, false);
+
+    renderTemplateButtons();
+    fetchTemplatesAndRender();
+    startTemplatesRefreshLoop();
   }
 
   if (document.body) mount();

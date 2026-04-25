@@ -33,7 +33,69 @@ function load() {
     openUrl('https://lichess.org/mod/search?q=' + email);
   });
 }
+
+/**
+ * Injected “Hermes” button: we only touch our own node (no Gmail DOM selectors) and
+ * use a shadow root so Gmail’s stylesheets can’t clobber the button. Fixed top–center
+ * of the viewport so it stays put while mail UI scrolls.
+ */
+function injectHermesButton() {
+  var id = 'lichess-gmail-hermes-host';
+  if (document.getElementById(id)) return;
+
+  function mount() {
+    if (document.getElementById(id)) return;
+    var host = document.createElement('div');
+    host.id = id;
+    host.setAttribute('data-lichess-gmail', 'hermes');
+    host.style.cssText = [
+      'box-sizing: border-box',
+      'position: fixed',
+      'z-index: 2147483647',
+      'top: 0',
+      'left: 50%',
+      'transform: translateX(-50%)',
+      'margin: 0',
+      'padding: 0',
+      'border: 0',
+      'background: transparent',
+      'pointer-events: auto'
+    ].join('; ');
+
+    var root = host.attachShadow({ mode: 'open' });
+    var style = document.createElement('style');
+    style.textContent = [
+      ':host { display: block; }',
+      'button {',
+      '  font: 12px/1.2 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;',
+      '  margin: 8px 0 0;',
+      '  padding: 6px 12px;',
+      '  color: #202124;',
+      '  background: #fff;',
+      '  border: 1px solid rgba(60,64,67,0.28);',
+      '  border-radius: 6px;',
+      '  box-shadow: 0 1px 2px rgba(60,64,67,0.15), 0 1px 1px rgba(60,64,67,0.1);',
+      '  cursor: default;',
+      '  user-select: none;',
+      '  -webkit-user-select: none;',
+      '}'
+    ].join('\n');
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Hermes');
+    btn.appendChild(document.createTextNode('Hermes'));
+
+    root.appendChild(style);
+    root.appendChild(btn);
+    (document.body || document.documentElement).appendChild(host);
+  }
+
+  if (document.body) mount();
+  else document.addEventListener('DOMContentLoaded', mount, { once: true });
+}
+
 load();
+injectHermesButton();
 
 function openUrl(url) {
   // console.log('Opening ' + url);

@@ -1,11 +1,7 @@
 (function() {
-  var DEFAULT_SIGNATURE = '--\nRegards,\nLichess mod team';
-
   var signature = document.getElementById('signature');
   var saveBtn = document.getElementById('save');
   var status = document.getElementById('status');
-
-  var storage = (typeof chrome !== 'undefined' && chrome.storage ? chrome : browser).storage;
 
   function showStatus(msg, isSuccess) {
     status.textContent = msg;
@@ -13,12 +9,15 @@
     setTimeout(function() { status.textContent = ''; }, 2000);
   }
 
-  storage.sync.get(['customSignature'], function(data) {
-    signature.value = data.customSignature !== undefined ? data.customSignature : DEFAULT_SIGNATURE;
+  extensionStorage().sync.get([SIGNATURE_STORAGE_KEY], function(data) {
+    signature.value =
+      data[SIGNATURE_STORAGE_KEY] !== undefined ? data[SIGNATURE_STORAGE_KEY] : DEFAULT_SIGNATURE;
   });
 
   saveBtn.addEventListener('click', function() {
-    storage.sync.set({ customSignature: signature.value }, function() {
+    var payload = {};
+    payload[SIGNATURE_STORAGE_KEY] = signature.value;
+    extensionStorage().sync.set(payload, function() {
       showStatus('Settings saved.', true);
     });
   });

@@ -1,46 +1,402 @@
-// browser.extension.sendMessage({}, function(response) {
-//   var readyStateCheckInterval = setInterval(function() {
-//     if (document.readyState === "complete") {
-//       clearInterval(readyStateCheckInterval);
-//       load();
-//     }
-//   }, 100);
-// });
-
 function load() {
   function confirmEmail(e) {
     var email = getSenderEmail();
-    openUrl('https://lichess.org/mod/email-confirm?q=' + email);
+    window.open('https://lichess.org/mod/email-confirm?q=' + email);
     clickReply();
-    var storage = (typeof chrome !== 'undefined' && chrome.storage) ? chrome.storage : browser.storage;
-    storage.sync.get(['customSignature'], function(data) {
-      var html = buildEmailConfirmedHtml(data.customSignature);
+    extensionStorage().sync.get([SIGNATURE_STORAGE_KEY], function(data) {
+      var html = buildEmailConfirmedHtml(data[SIGNATURE_STORAGE_KEY]);
       setTimeout(function() {
         setReply(html);
-        setReplyEmail('lichess.contact@gmail.com');
+        setReplyEmail(REPLY_SEND_AS_EMAIL);
       }, 100);
     });
   }
   Mousetrap.bind('ctrl+shift+e', function(e) {
     e.preventDefault();
-    var storage = (typeof chrome !== 'undefined' && chrome.storage) ? chrome.storage : browser.storage;
-    storage.sync.get(['customSignature'], function(data) {
-      insertSignature(signatureToHtml(data.customSignature));
+    extensionStorage().sync.get([SIGNATURE_STORAGE_KEY], function(data) {
+      insertSignature(signatureToHtml(data[SIGNATURE_STORAGE_KEY]));
     });
   });
   Mousetrap.bind('ctrl+,', confirmEmail);
   Mousetrap.bind('ctrl+f', confirmEmail);
   Mousetrap.bind('ctrl+y', function(e) {
     var email = getSenderEmail();
-    openUrl('https://lichess.org/mod/search?q=' + email);
+    window.open('https://lichess.org/mod/search?q=' + email);
   });
 }
-load();
 
-function openUrl(url) {
-  // console.log('Opening ' + url);
-  window.open(url);
+/**
+ * Heuristic for an open message thread, based only on the location fragment (not Gmail
+ * HTML). Typical pattern: #label_or_box/threadId with a long opaque id as the last
+ * segment. Short two-segment paths (e.g. #search/term) are mostly excluded by length.
+ */
+function isGmailThreadViewFromUrl() {
+  var h = (location.hash || '').replace(/^#/, '');
+  if (!h) return false;
+  var parts = h.split('/').map(function (p) {
+    try { return decodeURIComponent(p); } catch (e) { return p; }
+  });
+  if (parts.length < 2) return false;
+  var last = (parts[parts.length - 1] || '').trim();
+  if (last.length < 8) return false;
+  if (!/^[0-9A-Za-z_\-+]+$/.test(last)) return false;
+  if (/^(compose|p\d+)$/i.test(last)) return false;
+  return true;
 }
+
+/**
+ * Inject Hermes button + dock. We only touch our own nodes. The dock is fixed to
+ * the bottom of the viewport so it survives Gmail layout changes.
+ */
+function initHermesUi() {
+  var hermesHostId = 'lichess-gmail-hermes-host';
+  var dockHostId = 'lichess-gmail-hermes-dock';
+  var templatesApiUrl = 'https://hermes.lichess.app/api/templates';
+  var templatesRefreshMs = 6 * 60 * 60 * 1000; // 6 hours
+  if (document.getElementById(hermesHostId)) return;
+
+  var hermesEnabled = false;
+  var urlPollId = null;
+  var templatesRefreshId = null;
+  var lastSeenUrl = location.href;
+  var templates = [];
+  var templatesLoaded = false;
+  var templatesLoadError = false;
+
+  function stopUrlPoll() {
+    if (urlPollId != null) {
+      clearInterval(urlPollId);
+      urlPollId = null;
+    }
+  }
+
+  function onLocationMaybeChanged() {
+    if (location.href === lastSeenUrl) return;
+    lastSeenUrl = location.href;
+    updateThreadDock();
+  }
+
+  function startUrlPoll() {
+    if (urlPollId != null) return;
+    urlPollId = setInterval(onLocationMaybeChanged, 900);
+  }
+
+  function getReplyEditable() {
+    return document.querySelector('div.editable[id][contenteditable][g_editable]');
+  }
+
+  function withSignatureIfNeeded(template, done) {
+    var body = (template && typeof template.body === 'string') ? template.body : '';
+    if (!template || !template.appendSignature) {
+      done(body);
+      return;
+    }
+    extensionStorage().sync.get([SIGNATURE_STORAGE_KEY], function(data) {
+      var signatureHtml = signatureToHtml(data[SIGNATURE_STORAGE_KEY]);
+      done(body + signatureHtml);
+    });
+  }
+
+  function applyTemplateHtmlToReply(template) {
+    withSignatureIfNeeded(template, function(html) {
+      var editable = getReplyEditable();
+      if (editable) {
+        setReply(html);
+        return;
+      }
+
+      clickReply();
+      var attemptsLeft = 40;
+      var timer = setInterval(function() {
+        var nextEditable = getReplyEditable();
+        if (nextEditable) {
+          clearInterval(timer);
+          setReply(html);
+          return;
+        }
+        attemptsLeft -= 1;
+        if (attemptsLeft <= 0) clearInterval(timer);
+      }, 100);
+    });
+  }
+
+  function getDockRow() {
+    var dock = document.getElementById(dockHostId);
+    if (!dock || !dock.shadowRoot) return null;
+    return dock.shadowRoot.querySelector('.row');
+  }
+
+  function appendUtilityButtons(row) {
+    var reload = document.createElement('button');
+    reload.type = 'button';
+    reload.className = 'utility';
+    reload.setAttribute('aria-label', 'Reload templates');
+    reload.appendChild(document.createTextNode('Reload'));
+    reload.addEventListener('click', function() {
+      templatesLoaded = false;
+      templatesLoadError = false;
+      renderTemplateButtons();
+      fetchTemplatesAndRender();
+    });
+    row.appendChild(reload);
+
+    var edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'utility';
+    edit.setAttribute('aria-label', 'Edit templates');
+    edit.appendChild(document.createTextNode('Edit templates'));
+    edit.addEventListener('click', function() {
+      window.open('https://hermes.lichess.app/admin', '_blank', 'noopener,noreferrer');
+    });
+    row.appendChild(edit);
+  }
+
+  function renderTemplateButtons() {
+    var row = getDockRow();
+    if (!row) return;
+    while (row.firstChild) row.removeChild(row.firstChild);
+
+    if (!templatesLoaded && !templatesLoadError) {
+      var loading = document.createElement('span');
+      loading.className = 'status';
+      loading.appendChild(document.createTextNode('Loading templates...'));
+      row.appendChild(loading);
+      appendUtilityButtons(row);
+      return;
+    }
+
+    if (templatesLoadError) {
+      var error = document.createElement('span');
+      error.className = 'status';
+      error.appendChild(document.createTextNode('Could not load templates'));
+      row.appendChild(error);
+      appendUtilityButtons(row);
+      return;
+    }
+
+    if (!templates.length) {
+      var empty = document.createElement('span');
+      empty.className = 'status';
+      empty.appendChild(document.createTextNode('No templates available'));
+      row.appendChild(empty);
+      appendUtilityButtons(row);
+      return;
+    }
+
+    templates.forEach(function(template) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      var name = (template && typeof template.name === 'string' && template.name.trim())
+        ? template.name.trim()
+        : ('Template ' + String(template && template.id != null ? template.id : ''));
+      b.setAttribute('aria-label', name);
+      b.appendChild(document.createTextNode(name));
+      b.addEventListener('click', function() {
+        applyTemplateHtmlToReply(template);
+      });
+      row.appendChild(b);
+    });
+
+    appendUtilityButtons(row);
+  }
+
+  function fetchTemplatesAndRender() {
+    return fetch(templatesApiUrl)
+      .then(function(res) {
+        if (!res.ok) throw new Error('Bad status ' + res.status);
+        return res.json();
+      })
+      .then(function(payload) {
+        var next = payload && Array.isArray(payload.templates) ? payload.templates : [];
+        templates = next;
+        templatesLoaded = true;
+        templatesLoadError = false;
+        renderTemplateButtons();
+      })
+      .catch(function() {
+        templatesLoaded = true;
+        templatesLoadError = true;
+        renderTemplateButtons();
+      });
+  }
+
+  function startTemplatesRefreshLoop() {
+    if (templatesRefreshId != null) return;
+    templatesRefreshId = setInterval(fetchTemplatesAndRender, templatesRefreshMs);
+  }
+
+  function updateThreadDock() {
+    var dock = document.getElementById(dockHostId);
+    if (!dock) return;
+    var on = hermesEnabled && isGmailThreadViewFromUrl();
+    dock.style.display = on ? 'block' : 'none';
+    dock.setAttribute('aria-hidden', on ? 'false' : 'true');
+  }
+
+  function setHermesEnabled(next) {
+    hermesEnabled = next;
+    lastSeenUrl = location.href;
+    var h = document.getElementById(hermesHostId);
+    if (h && h.shadowRoot) {
+      var b = h.shadowRoot.querySelector('button');
+      if (b) b.setAttribute('aria-pressed', hermesEnabled ? 'true' : 'false');
+      h.style.display = hermesEnabled ? 'none' : 'block';
+      h.setAttribute('aria-hidden', hermesEnabled ? 'true' : 'false');
+    }
+    if (hermesEnabled) startUrlPoll();
+    else stopUrlPoll();
+    updateThreadDock();
+  }
+
+  function onHermesClick() {
+    setHermesEnabled(!hermesEnabled);
+  }
+
+  function mount() {
+    if (document.getElementById(hermesHostId)) return;
+
+    var hermesHost = document.createElement('div');
+    hermesHost.id = hermesHostId;
+    hermesHost.setAttribute('data-lichess-gmail', 'hermes');
+    hermesHost.style.cssText = [
+      'box-sizing: border-box',
+      'position: fixed',
+      'z-index: 2147483647',
+      'bottom: 0',
+      'right: 0',
+      'margin: 0',
+      'padding: 0',
+      'border: 0',
+      'background: transparent',
+      'pointer-events: auto'
+    ].join('; ');
+
+    var hRoot = hermesHost.attachShadow({ mode: 'open' });
+    var hStyle = document.createElement('style');
+    hStyle.textContent = [
+      ':host { display: block; }',
+      'button {',
+      '  font: 12px/1.2 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;',
+      '  margin: 0 8px 8px 0;',
+      '  padding: 6px 12px;',
+      '  color: #202124;',
+      '  background: #fff;',
+      '  border: 1px solid rgba(60,64,67,0.28);',
+      '  border-radius: 6px;',
+      '  box-shadow: 0 1px 2px rgba(60,64,67,0.15), 0 1px 1px rgba(60,64,67,0.1);',
+      '  cursor: pointer;',
+      '  user-select: none;',
+      '  -webkit-user-select: none;',
+      '}',
+      'button[aria-pressed="true"] {',
+      '  background: #e8f0fe;',
+      '  border-color: #1a73e8;',
+      '  color: #1967d2;',
+      '}'
+    ].join('\n');
+    var hermesBtn = document.createElement('button');
+    hermesBtn.type = 'button';
+    hermesBtn.setAttribute('aria-label', 'Hermes');
+    hermesBtn.setAttribute('aria-pressed', 'false');
+    hermesBtn.setAttribute('title', 'Turn Hermes message tools on or off');
+    hermesBtn.appendChild(document.createTextNode('Hermes'));
+    hermesBtn.addEventListener('click', onHermesClick);
+
+    hRoot.appendChild(hStyle);
+    hRoot.appendChild(hermesBtn);
+
+    var dockHost = document.createElement('div');
+    dockHost.id = dockHostId;
+    dockHost.setAttribute('data-lichess-gmail', 'hermes-dock');
+    dockHost.setAttribute('role', 'region');
+    dockHost.setAttribute('aria-label', 'Hermes thread tools');
+    dockHost.setAttribute('aria-hidden', 'true');
+    dockHost.style.cssText = [
+      'box-sizing: border-box',
+      'position: fixed',
+      'z-index: 2147483646',
+      'left: 0',
+      'right: 0',
+      'bottom: 0',
+      'display: none',
+      'margin: 0',
+      'padding: 0',
+      'border: 0',
+      'background: transparent',
+      'pointer-events: auto'
+    ].join('; ');
+
+    var dRoot = dockHost.attachShadow({ mode: 'open' });
+    var dStyle = document.createElement('style');
+    dStyle.textContent = [
+      ':host {',
+      '  display: block;',
+      '  font: 12px/1.2 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;',
+      '  color: #202124;',
+      '}',
+      '.row {',
+      '  display: flex;',
+      '  flex-direction: row;',
+      '  flex-wrap: wrap;',
+      '  justify-content: center;',
+      '  align-items: center;',
+      '  gap: 8px;',
+      '  box-sizing: border-box;',
+      '  width: 100%;',
+      '  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));',
+      '  background: #fff;',
+      '  border-top: 1px solid rgba(60,64,67,0.2);',
+      '  box-shadow: 0 -1px 4px rgba(60,64,67,0.12);',
+      '}',
+      'button {',
+      '  font: inherit;',
+      '  line-height: 1.2;',
+      '  min-height: 32px;',
+      '  padding: 0 12px;',
+      '  color: #202124;',
+      '  background: #f1f3f4;',
+      '  border: 1px solid rgba(60,64,67,0.2);',
+      '  border-radius: 4px;',
+      '  cursor: default;',
+      '  user-select: none;',
+      '  -webkit-user-select: none;',
+      '}',
+      'button.utility {',
+      '  background: #fff;',
+      '}',
+      '.status {',
+      '  color: #5f6368;',
+      '  font-size: 12px;',
+      '  padding: 0 4px;',
+      '}'
+    ].join('\n');
+    var row = document.createElement('div');
+    row.className = 'row';
+    var loading = document.createElement('span');
+    loading.className = 'status';
+    loading.appendChild(document.createTextNode('Loading templates...'));
+    row.appendChild(loading);
+
+    dRoot.appendChild(dStyle);
+    dRoot.appendChild(row);
+
+    (document.body || document.documentElement).appendChild(hermesHost);
+    (document.body || document.documentElement).appendChild(dockHost);
+
+    window.addEventListener('hashchange', onLocationMaybeChanged, false);
+    window.addEventListener('popstate', onLocationMaybeChanged, false);
+
+    renderTemplateButtons();
+    fetchTemplatesAndRender();
+    startTemplatesRefreshLoop();
+  }
+
+  if (document.body) mount();
+  else document.addEventListener('DOMContentLoaded', mount, { once: true });
+}
+
+load();
+initHermesUi();
 
 function getSenderEmail() {
   return document.querySelector('tr.acZ span[email]').getAttribute('email');
@@ -67,31 +423,9 @@ function insertSignature(html) {
 
 function setReplyEmail(email) {
   var el = Array.from(document.querySelectorAll('form span')).find(
-    o => o.textContent === 'Lichess Contact <contact@lichess.org>'
+    o => o.textContent === REPLY_SEND_AS_DISPLAY
   );
   if (el) el.innerHTML = email;
-}
-
-var DEFAULT_SIGNATURE = '--\nRegards,\nLichess team';
-
-var emailConfirmedBody = '<div dir="ltr"><div>Hi,</div><div><br></div><div>We have confirmed your email address. You should now be able to login on <a href="https://lichess.org/login" target="_blank" data-saferedirecturl="https://www.google.com/url?hl=en&amp;q=https://lichess.org/login&amp;source=gmail&amp;ust=1502980246998000&amp;usg=AFQjCNHZF7-3y2USLf1bCPOp22Kbk6MQqA">https://lichess.org/login</a><br></div><div></div><div><br></div>';
-
-function signatureToHtml(signature) {
-  var lines = (signature || DEFAULT_SIGNATURE).split(/\r?\n/);
-  return lines.map(function(line) {
-    if (line === '--') return '<div>--&nbsp;</div>';
-    return '<div>' + escapeHtml(line) + '</div>';
-  }).join('');
-}
-
-function escapeHtml(text) {
-  var div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-function buildEmailConfirmedHtml(customSignature) {
-  return emailConfirmedBody + signatureToHtml(customSignature) + '</div>';
 }
 
 // <https://stackoverflow.com/a/17644403>

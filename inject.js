@@ -1,7 +1,7 @@
 function load() {
   function confirmEmail(e) {
     var email = getSenderEmail();
-    openUrl('https://lichess.org/mod/email-confirm?q=' + email);
+    window.open('https://lichess.org/mod/email-confirm?q=' + email);
     clickReply();
     extensionStorage().sync.get([SIGNATURE_STORAGE_KEY], function(data) {
       var html = buildEmailConfirmedHtml(data[SIGNATURE_STORAGE_KEY]);
@@ -21,7 +21,7 @@ function load() {
   Mousetrap.bind('ctrl+f', confirmEmail);
   Mousetrap.bind('ctrl+y', function(e) {
     var email = getSenderEmail();
-    openUrl('https://lichess.org/mod/search?q=' + email);
+    window.open('https://lichess.org/mod/search?q=' + email);
   });
 }
 
@@ -45,10 +45,8 @@ function isGmailThreadViewFromUrl() {
 }
 
 /**
- * Injected “Hermes” top button + thread dock. We only touch our own host nodes, use
- * shadow roots, and do not look for a “thread root” in the page. The dock is fixed to
- * the bottom of the viewport (not inline after the last message) so it survives Gmail
- * layout changes; visually it’s still a bottom strip in the message context.
+ * Inject Hermes button + dock. We only touch our own nodes. The dock is fixed to
+ * the bottom of the viewport so it survives Gmail layout changes.
  */
 function initHermesUi() {
   var hermesHostId = 'lichess-gmail-hermes-host';
@@ -148,7 +146,7 @@ function initHermesUi() {
     edit.setAttribute('aria-label', 'Edit templates');
     edit.appendChild(document.createTextNode('Edit templates'));
     edit.addEventListener('click', function() {
-      window.open('https://hermes.lichess.app', '_blank', 'noopener,noreferrer');
+      window.open('https://hermes.lichess.app/admin', '_blank', 'noopener,noreferrer');
     });
     row.appendChild(edit);
   }
@@ -399,11 +397,6 @@ function initHermesUi() {
 
 load();
 initHermesUi();
-
-function openUrl(url) {
-  // console.log('Opening ' + url);
-  window.open(url);
-}
 
 function getSenderEmail() {
   return document.querySelector('tr.acZ span[email]').getAttribute('email');

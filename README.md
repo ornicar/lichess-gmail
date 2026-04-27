@@ -8,17 +8,29 @@
 - Open `chrome://extensions/` in your browser.
 - Remove the previous version if any.
 - Click "Load unpacked" and select the unzipped folder.
-- To configure your signature: click the extension icon in your toolbar to open the popup.
+- To configure your signature, click the extension icon in the toolbar.
 
 **Firefox**
 - Same steps as Chrome, but open `about:debugging`, click "This Firefox", then "Load Temporary Add-on" and select the `manifest.json` file from the unzipped folder.
-- To configure your signature: click the extension icon in the toolbar to open the popup.
+- To configure your signature, click the extension icon in the toolbar.
+
+### Hermes email templates
+
+Hermes is an internal Lichess tool that stores our email templates. Use `Ctrl+Shift+Q` to expand the Hermes UI in Gmail. Click a template name to reply with that template. View and edit the templates at https://hermes.lichess.app.
 
 ### Commands:
+
+#### `Ctrl+Shift+Q`
+
+Toggles the Hermes UI on/off in the Gmail thread view.
 
 #### `Ctrl+Shift+E`
 
 Inserts your configured email signature at the cursor in the current email text area.
+
+#### `Ctrl+y`
+
+Opens lichess search user page, with the sender email.
 
 #### `Ctrl+,` or `Ctrl+F`
 
@@ -27,10 +39,6 @@ For email confirmation requests. This shortcut:
 - opens the [lichess email confirmation UI](https://github.com/ornicar/lila/wiki/Handling-email-address-confirmation) in a new tab, with the email loaded
 - prepares a gmail reply with the corresponding canned response, in case the email confirmation succeeded
 - changes our sending email from `contact@lichess.org` to `lichess.contact@gmail.com`, in case the user's email provider blocks `lichess.org` (it happens).
-
-#### `Ctrl+y`
-
-Opens lichess search user page, with the sender email.
 
 #### Select text, right click menu
 

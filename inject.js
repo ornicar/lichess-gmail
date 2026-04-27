@@ -244,9 +244,20 @@ function initHermesUi() {
   function updateThreadDock() {
     var dock = document.getElementById(dockHostId);
     if (!dock) return;
-    var on = hermesEnabled && isGmailThreadViewFromUrl();
+    var isThreadView = isGmailThreadViewFromUrl();
+    var on = hermesEnabled && isThreadView;
     dock.style.display = on ? 'block' : 'none';
     dock.setAttribute('aria-hidden', on ? 'false' : 'true');
+    updateHermesLauncherVisibility(isThreadView);
+  }
+
+  function updateHermesLauncherVisibility(isThreadView) {
+    var h = document.getElementById(hermesHostId);
+    if (!h) return;
+    var threadView = typeof isThreadView === 'boolean' ? isThreadView : isGmailThreadViewFromUrl();
+    var showLauncher = threadView && !hermesEnabled;
+    h.style.display = showLauncher ? 'block' : 'none';
+    h.setAttribute('aria-hidden', showLauncher ? 'false' : 'true');
   }
 
   function setHermesEnabled(next) {
@@ -256,10 +267,8 @@ function initHermesUi() {
     if (h && h.shadowRoot) {
       var b = h.shadowRoot.querySelector('button');
       if (b) b.setAttribute('aria-pressed', hermesEnabled ? 'true' : 'false');
-      var showLauncher = !hermesEnabled;
-      h.style.display = showLauncher ? 'block' : 'none';
-      h.setAttribute('aria-hidden', showLauncher ? 'false' : 'true');
     }
+    updateHermesLauncherVisibility();
     if (hermesEnabled) startUrlPoll();
     else stopUrlPoll();
     updateThreadDock();
@@ -280,12 +289,14 @@ function initHermesUi() {
     var hermesHost = document.createElement('div');
     hermesHost.id = hermesHostId;
     hermesHost.setAttribute('data-lichess-gmail', 'hermes');
+    hermesHost.setAttribute('aria-hidden', 'true');
     hermesHost.style.cssText = [
       'box-sizing: border-box',
       'position: fixed',
       'z-index: 2147483647',
       'bottom: 0',
       'right: 0',
+      'display: none',
       'margin: 0',
       'padding: 0',
       'border: 0',
@@ -411,6 +422,7 @@ function initHermesUi() {
     renderTemplateButtons();
     fetchTemplatesAndRender();
     startTemplatesRefreshLoop();
+    updateThreadDock();
   }
 
   if (document.body) mount();

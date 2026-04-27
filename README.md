@@ -16,7 +16,7 @@
 
 ### Hermes email templates
 
-Hermes is an internal Lichess tool that stores our email templates. Use `Ctrl+Shift+Q` to expand the Hermes UI in Gmail. Click a template name to reply with that template. View and edit the templates at https://hermes.lichess.app.
+Hermes is an internal Lichess tool that stores our email templates. When viewing a conversation thread in Gmail, use `Ctrl+Shift+Q` to expand the Hermes UI. Click a template name to reply with that template. View and edit the templates at https://hermes.lichess.app.
 
 ### Commands:
 

@@ -421,7 +421,8 @@ function getSenderEmail() {
 }
 
 function clickReply() {
-  document.querySelector('button[aria-label=Reply] span[jsname][aria-hidden=true]').click();
+  const replies = document.querySelectorAll('button[aria-label=Reply] span[jsname][aria-hidden=true]');
+  if (replies.length > 0) replies[replies.length - 1].click();
 }
 
 function setReply(html) {

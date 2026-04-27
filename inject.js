@@ -155,8 +155,8 @@ function initHermesUi() {
     var collapse = document.createElement('button');
     collapse.type = 'button';
     collapse.className = 'utility collapse';
-    collapse.setAttribute('aria-label', 'Collapse Hermes tools (Ctrl+Shift+Q)');
-    collapse.appendChild(document.createTextNode('Collapse (Ctrl+Shift+Q)'));
+    collapse.setAttribute('aria-label', 'Collapse Hermes tools (Ctrl+Shift+G)');
+    collapse.appendChild(document.createTextNode('Collapse (Ctrl+Shift+G)'));
     collapse.addEventListener('click', function() {
       setHermesEnabled(false);
     });
@@ -329,10 +329,10 @@ function initHermesUi() {
     ].join('\n');
     var hermesBtn = document.createElement('button');
     hermesBtn.type = 'button';
-    hermesBtn.setAttribute('aria-label', 'Hermes (Ctrl+Shift+Q)');
+    hermesBtn.setAttribute('aria-label', 'Hermes (Ctrl+Shift+G)');
     hermesBtn.setAttribute('aria-pressed', 'false');
-    hermesBtn.setAttribute('title', 'Turn Hermes message tools on or off (Ctrl+Shift+Q)');
-    hermesBtn.appendChild(document.createTextNode('Hermes (Ctrl+Shift+Q)'));
+    hermesBtn.setAttribute('title', 'Turn Hermes message tools on or off (Ctrl+Shift+G)');
+    hermesBtn.appendChild(document.createTextNode('Hermes (Ctrl+Shift+G)'));
     hermesBtn.addEventListener('click', onHermesClick);
 
     hRoot.appendChild(hStyle);
@@ -428,7 +428,7 @@ function initHermesUi() {
   if (document.body) mount();
   else document.addEventListener('DOMContentLoaded', mount, { once: true });
 
-  Mousetrap.bind('ctrl+shift+q', toggleHermesEnabledWithShortcut);
+  Mousetrap.bind('ctrl+shift+g', toggleHermesEnabledWithShortcut);
 }
 
 load();

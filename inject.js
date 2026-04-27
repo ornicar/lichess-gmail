@@ -151,6 +151,18 @@ function initHermesUi() {
     row.appendChild(edit);
   }
 
+  function appendCollapseButton(row) {
+    var collapse = document.createElement('button');
+    collapse.type = 'button';
+    collapse.className = 'utility collapse';
+    collapse.setAttribute('aria-label', 'Collapse Hermes tools');
+    collapse.appendChild(document.createTextNode('Collapse'));
+    collapse.addEventListener('click', function() {
+      setHermesEnabled(false);
+    });
+    row.appendChild(collapse);
+  }
+
   function renderTemplateButtons() {
     var row = getDockRow();
     if (!row) return;
@@ -162,6 +174,7 @@ function initHermesUi() {
       loading.appendChild(document.createTextNode('Loading templates...'));
       row.appendChild(loading);
       appendUtilityButtons(row);
+      appendCollapseButton(row);
       return;
     }
 
@@ -171,6 +184,7 @@ function initHermesUi() {
       error.appendChild(document.createTextNode('Could not load templates'));
       row.appendChild(error);
       appendUtilityButtons(row);
+      appendCollapseButton(row);
       return;
     }
 
@@ -180,6 +194,7 @@ function initHermesUi() {
       empty.appendChild(document.createTextNode('No templates available'));
       row.appendChild(empty);
       appendUtilityButtons(row);
+      appendCollapseButton(row);
       return;
     }
 
@@ -198,6 +213,7 @@ function initHermesUi() {
     });
 
     appendUtilityButtons(row);
+    appendCollapseButton(row);
   }
 
   function fetchTemplatesAndRender() {
@@ -240,8 +256,9 @@ function initHermesUi() {
     if (h && h.shadowRoot) {
       var b = h.shadowRoot.querySelector('button');
       if (b) b.setAttribute('aria-pressed', hermesEnabled ? 'true' : 'false');
-      h.style.display = hermesEnabled ? 'none' : 'block';
-      h.setAttribute('aria-hidden', hermesEnabled ? 'true' : 'false');
+      var showLauncher = !hermesEnabled;
+      h.style.display = showLauncher ? 'block' : 'none';
+      h.setAttribute('aria-hidden', showLauncher ? 'false' : 'true');
     }
     if (hermesEnabled) startUrlPoll();
     else stopUrlPoll();

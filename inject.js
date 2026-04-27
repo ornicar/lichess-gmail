@@ -151,6 +151,18 @@ function initHermesUi() {
     row.appendChild(edit);
   }
 
+  function appendCollapseButton(row) {
+    var collapse = document.createElement('button');
+    collapse.type = 'button';
+    collapse.className = 'utility collapse';
+    collapse.setAttribute('aria-label', 'Collapse Hermes tools (Ctrl+Shift+Q)');
+    collapse.appendChild(document.createTextNode('Collapse (Ctrl+Shift+Q)'));
+    collapse.addEventListener('click', function() {
+      setHermesEnabled(false);
+    });
+    row.appendChild(collapse);
+  }
+
   function renderTemplateButtons() {
     var row = getDockRow();
     if (!row) return;
@@ -162,6 +174,7 @@ function initHermesUi() {
       loading.appendChild(document.createTextNode('Loading templates...'));
       row.appendChild(loading);
       appendUtilityButtons(row);
+      appendCollapseButton(row);
       return;
     }
 
@@ -171,6 +184,7 @@ function initHermesUi() {
       error.appendChild(document.createTextNode('Could not load templates'));
       row.appendChild(error);
       appendUtilityButtons(row);
+      appendCollapseButton(row);
       return;
     }
 
@@ -180,6 +194,7 @@ function initHermesUi() {
       empty.appendChild(document.createTextNode('No templates available'));
       row.appendChild(empty);
       appendUtilityButtons(row);
+      appendCollapseButton(row);
       return;
     }
 
@@ -198,6 +213,7 @@ function initHermesUi() {
     });
 
     appendUtilityButtons(row);
+    appendCollapseButton(row);
   }
 
   function fetchTemplatesAndRender() {
@@ -240,8 +256,9 @@ function initHermesUi() {
     if (h && h.shadowRoot) {
       var b = h.shadowRoot.querySelector('button');
       if (b) b.setAttribute('aria-pressed', hermesEnabled ? 'true' : 'false');
-      h.style.display = hermesEnabled ? 'none' : 'block';
-      h.setAttribute('aria-hidden', hermesEnabled ? 'true' : 'false');
+      var showLauncher = !hermesEnabled;
+      h.style.display = showLauncher ? 'block' : 'none';
+      h.setAttribute('aria-hidden', showLauncher ? 'false' : 'true');
     }
     if (hermesEnabled) startUrlPoll();
     else stopUrlPoll();
@@ -249,6 +266,11 @@ function initHermesUi() {
   }
 
   function onHermesClick() {
+    setHermesEnabled(!hermesEnabled);
+  }
+
+  function toggleHermesEnabledWithShortcut(e) {
+    if (e && e.preventDefault) e.preventDefault();
     setHermesEnabled(!hermesEnabled);
   }
 
@@ -296,10 +318,10 @@ function initHermesUi() {
     ].join('\n');
     var hermesBtn = document.createElement('button');
     hermesBtn.type = 'button';
-    hermesBtn.setAttribute('aria-label', 'Hermes');
+    hermesBtn.setAttribute('aria-label', 'Hermes (Ctrl+Shift+Q)');
     hermesBtn.setAttribute('aria-pressed', 'false');
-    hermesBtn.setAttribute('title', 'Turn Hermes message tools on or off');
-    hermesBtn.appendChild(document.createTextNode('Hermes'));
+    hermesBtn.setAttribute('title', 'Turn Hermes message tools on or off (Ctrl+Shift+Q)');
+    hermesBtn.appendChild(document.createTextNode('Hermes (Ctrl+Shift+Q)'));
     hermesBtn.addEventListener('click', onHermesClick);
 
     hRoot.appendChild(hStyle);
@@ -393,6 +415,8 @@ function initHermesUi() {
 
   if (document.body) mount();
   else document.addEventListener('DOMContentLoaded', mount, { once: true });
+
+  Mousetrap.bind('ctrl+shift+q', toggleHermesEnabledWithShortcut);
 }
 
 load();
@@ -404,7 +428,8 @@ function getSenderEmail() {
 }
 
 function clickReply() {
-  document.querySelector('button[aria-label=Reply] span[jsname][aria-hidden=true]').click();
+  const replies = document.querySelectorAll('button[aria-label=Reply] span[jsname][aria-hidden=true]');
+  if (replies.length > 0) replies[replies.length - 1].click();
 }
 
 function setReply(html) {

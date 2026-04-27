@@ -155,8 +155,8 @@ function initHermesUi() {
     var collapse = document.createElement('button');
     collapse.type = 'button';
     collapse.className = 'utility collapse';
-    collapse.setAttribute('aria-label', 'Collapse Hermes tools');
-    collapse.appendChild(document.createTextNode('Collapse'));
+    collapse.setAttribute('aria-label', 'Collapse Hermes tools (Ctrl+Shift+Q)');
+    collapse.appendChild(document.createTextNode('Collapse (Ctrl+Shift+Q)'));
     collapse.addEventListener('click', function() {
       setHermesEnabled(false);
     });
@@ -269,6 +269,11 @@ function initHermesUi() {
     setHermesEnabled(!hermesEnabled);
   }
 
+  function toggleHermesEnabledWithShortcut(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    setHermesEnabled(!hermesEnabled);
+  }
+
   function mount() {
     if (document.getElementById(hermesHostId)) return;
 
@@ -313,10 +318,10 @@ function initHermesUi() {
     ].join('\n');
     var hermesBtn = document.createElement('button');
     hermesBtn.type = 'button';
-    hermesBtn.setAttribute('aria-label', 'Hermes');
+    hermesBtn.setAttribute('aria-label', 'Hermes (Ctrl+Shift+Q)');
     hermesBtn.setAttribute('aria-pressed', 'false');
-    hermesBtn.setAttribute('title', 'Turn Hermes message tools on or off');
-    hermesBtn.appendChild(document.createTextNode('Hermes'));
+    hermesBtn.setAttribute('title', 'Turn Hermes message tools on or off (Ctrl+Shift+Q)');
+    hermesBtn.appendChild(document.createTextNode('Hermes (Ctrl+Shift+Q)'));
     hermesBtn.addEventListener('click', onHermesClick);
 
     hRoot.appendChild(hStyle);
@@ -410,6 +415,8 @@ function initHermesUi() {
 
   if (document.body) mount();
   else document.addEventListener('DOMContentLoaded', mount, { once: true });
+
+  Mousetrap.bind('ctrl+shift+q', toggleHermesEnabledWithShortcut);
 }
 
 load();

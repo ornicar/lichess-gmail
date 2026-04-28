@@ -62,6 +62,32 @@ function initHermesUi() {
   var templates = [];
   var templatesLoaded = false;
   var templatesLoadError = false;
+  var selectedCategory = 'all';
+  var categories = [];
+
+  function normalizeCategory(c) {
+    if (typeof c !== 'string') return '';
+    return c.trim().toLowerCase();
+  }
+
+  function formatCategoryLabel(c) {
+    if (!c) return 'Uncategorized';
+    return c.charAt(0).toUpperCase() + c.slice(1);
+  }
+
+  function recomputeCategories() {
+    var seen = Object.create(null);
+    templates.forEach(function(t) {
+      var k = normalizeCategory(t && t.category);
+      if (k) seen[k] = true;
+    });
+    categories = Object.keys(seen).sort(function(a, b) {
+      return a.localeCompare(b);
+    });
+    if (selectedCategory !== 'all' && categories.indexOf(selectedCategory) === -1) {
+      selectedCategory = 'all';
+    }
+  }
 
   function stopUrlPoll() {
     if (urlPollId != null) {
@@ -120,10 +146,13 @@ function initHermesUi() {
     });
   }
 
-  function getDockRow() {
+  function getDockParts() {
     var dock = document.getElementById(dockHostId);
     if (!dock || !dock.shadowRoot) return null;
-    return dock.shadowRoot.querySelector('.row');
+    return {
+      templatesRow: dock.shadowRoot.querySelector('.templatesRow'),
+      controlsRow: dock.shadowRoot.querySelector('.controlsRow')
+    };
   }
 
   function appendUtilityButtons(row) {
@@ -135,7 +164,7 @@ function initHermesUi() {
     reload.addEventListener('click', function() {
       templatesLoaded = false;
       templatesLoadError = false;
-      renderTemplateButtons();
+      renderDock();
       fetchTemplatesAndRender();
     });
     row.appendChild(reload);
@@ -163,18 +192,62 @@ function initHermesUi() {
     row.appendChild(collapse);
   }
 
-  function renderTemplateButtons() {
-    var row = getDockRow();
-    if (!row) return;
-    while (row.firstChild) row.removeChild(row.firstChild);
+  function appendCategorySelector(row) {
+    var wrap = document.createElement('span');
+    wrap.className = 'category';
+
+    var label = document.createElement('span');
+    label.className = 'categoryLabel';
+    label.appendChild(document.createTextNode('Category'));
+    wrap.appendChild(label);
+
+    var select = document.createElement('select');
+    select.className = 'categorySelect';
+    select.setAttribute('aria-label', 'Template category');
+
+    var allOpt = document.createElement('option');
+    allOpt.value = 'all';
+    allOpt.appendChild(document.createTextNode('All'));
+    select.appendChild(allOpt);
+
+    categories.forEach(function(c) {
+      var opt = document.createElement('option');
+      opt.value = c;
+      opt.appendChild(document.createTextNode(formatCategoryLabel(c)));
+      select.appendChild(opt);
+    });
+
+    select.value = selectedCategory;
+    select.addEventListener('change', function() {
+      selectedCategory = select.value;
+      renderDock();
+    });
+
+    wrap.appendChild(select);
+    row.appendChild(wrap);
+  }
+
+  function clearNode(n) {
+    if (!n) return;
+    while (n.firstChild) n.removeChild(n.firstChild);
+  }
+
+  function renderDock() {
+    var parts = getDockParts();
+    if (!parts || !parts.templatesRow || !parts.controlsRow) return;
+    clearNode(parts.templatesRow);
+    clearNode(parts.controlsRow);
+
+    // Controls on bottom row
+    appendCategorySelector(parts.controlsRow);
+    appendUtilityButtons(parts.controlsRow);
+    appendCollapseButton(parts.controlsRow);
 
     if (!templatesLoaded && !templatesLoadError) {
       var loading = document.createElement('span');
       loading.className = 'status';
       loading.appendChild(document.createTextNode('Loading templates...'));
-      row.appendChild(loading);
-      appendUtilityButtons(row);
-      appendCollapseButton(row);
+      parts.templatesRow.appendChild(loading);
       return;
     }
 
@@ -182,9 +255,7 @@ function initHermesUi() {
       var error = document.createElement('span');
       error.className = 'status';
       error.appendChild(document.createTextNode('Could not load templates'));
-      row.appendChild(error);
-      appendUtilityButtons(row);
-      appendCollapseButton(row);
+      parts.templatesRow.appendChild(error);
       return;
     }
 
@@ -192,28 +263,38 @@ function initHermesUi() {
       var empty = document.createElement('span');
       empty.className = 'status';
       empty.appendChild(document.createTextNode('No templates available'));
-      row.appendChild(empty);
-      appendUtilityButtons(row);
-      appendCollapseButton(row);
+      parts.templatesRow.appendChild(empty);
       return;
     }
 
-    templates.forEach(function(template) {
+    var filtered = templates.filter(function(t) {
+      if (selectedCategory === 'all') return true;
+      return normalizeCategory(t && t.category) === selectedCategory;
+    });
+
+    if (!filtered.length) {
+      var none = document.createElement('span');
+      none.className = 'status';
+      none.appendChild(document.createTextNode('No templates in this category'));
+      parts.templatesRow.appendChild(none);
+      return;
+    }
+
+    filtered.forEach(function(template) {
       var b = document.createElement('button');
       b.type = 'button';
+      b.className = 'templateChip';
       var name = (template && typeof template.name === 'string' && template.name.trim())
         ? template.name.trim()
         : ('Template ' + String(template && template.id != null ? template.id : ''));
       b.setAttribute('aria-label', name);
+      b.setAttribute('title', name);
       b.appendChild(document.createTextNode(name));
       b.addEventListener('click', function() {
         applyTemplateHtmlToReply(template);
       });
-      row.appendChild(b);
+      parts.templatesRow.appendChild(b);
     });
-
-    appendUtilityButtons(row);
-    appendCollapseButton(row);
   }
 
   function fetchTemplatesAndRender() {
@@ -227,12 +308,13 @@ function initHermesUi() {
         templates = next;
         templatesLoaded = true;
         templatesLoadError = false;
-        renderTemplateButtons();
+        recomputeCategories();
+        renderDock();
       })
       .catch(function() {
         templatesLoaded = true;
         templatesLoadError = true;
-        renderTemplateButtons();
+        renderDock();
       });
   }
 
@@ -367,35 +449,73 @@ function initHermesUi() {
       '  font: 12px/1.2 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;',
       '  color: #202124;',
       '}',
-      '.row {',
+      '.dock {',
+      '  box-sizing: border-box;',
+      '  width: 100%;',
+      '  background: #fff;',
+      '  border-top: 1px solid rgba(60,64,67,0.2);',
+      '  box-shadow: 0 -1px 4px rgba(60,64,67,0.12);',
+      '  padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));',
+      '  display: flex;',
+      '  flex-direction: column;',
+      '  gap: 6px;',
+      '}',
+      '.templatesRow {',
       '  display: flex;',
       '  flex-direction: row;',
       '  flex-wrap: wrap;',
       '  justify-content: center;',
       '  align-items: center;',
-      '  gap: 8px;',
-      '  box-sizing: border-box;',
-      '  width: 100%;',
-      '  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));',
-      '  background: #fff;',
-      '  border-top: 1px solid rgba(60,64,67,0.2);',
-      '  box-shadow: 0 -1px 4px rgba(60,64,67,0.12);',
+      '  gap: 6px;',
+      '}',
+      '.controlsRow {',
+      '  display: flex;',
+      '  flex-direction: row;',
+      '  flex-wrap: wrap;',
+      '  justify-content: center;',
+      '  align-items: center;',
+      '  gap: 6px;',
       '}',
       'button {',
       '  font: inherit;',
       '  line-height: 1.2;',
-      '  min-height: 32px;',
-      '  padding: 0 12px;',
+        '  min-height: 28px;',
+        '  padding: 0 10px;',
       '  color: #202124;',
       '  background: #f1f3f4;',
       '  border: 1px solid rgba(60,64,67,0.2);',
-      '  border-radius: 4px;',
+        '  border-radius: 6px;',
       '  cursor: default;',
       '  user-select: none;',
       '  -webkit-user-select: none;',
       '}',
+      'button.templateChip {',
+      '  min-height: 24px;',
+      '  padding: 0 10px;',
+      '  border-radius: 9999px;',
+      '  background: #e8eaed;',
+      '}',
       'button.utility {',
       '  background: #fff;',
+      '}',
+      '.category {',
+      '  display: inline-flex;',
+      '  align-items: center;',
+      '  gap: 6px;',
+      '  padding: 0 4px;',
+      '}',
+      '.categoryLabel {',
+      '  color: #5f6368;',
+      '  font-size: 12px;',
+      '}',
+      '.categorySelect {',
+      '  font: inherit;',
+      '  min-height: 32px;',
+      '  padding: 0 10px;',
+      '  background: #fff;',
+      '  border: 1px solid rgba(60,64,67,0.2);',
+      '  border-radius: 4px;',
+      '  color: #202124;',
       '}',
       '.status {',
       '  color: #5f6368;',
@@ -403,15 +523,19 @@ function initHermesUi() {
       '  padding: 0 4px;',
       '}'
     ].join('\n');
-    var row = document.createElement('div');
-    row.className = 'row';
-    var loading = document.createElement('span');
-    loading.className = 'status';
-    loading.appendChild(document.createTextNode('Loading templates...'));
-    row.appendChild(loading);
-
     dRoot.appendChild(dStyle);
-    dRoot.appendChild(row);
+    var dock = document.createElement('div');
+    dock.className = 'dock';
+
+    var templatesRow = document.createElement('div');
+    templatesRow.className = 'templatesRow';
+    dock.appendChild(templatesRow);
+
+    var controlsRow = document.createElement('div');
+    controlsRow.className = 'controlsRow';
+    dock.appendChild(controlsRow);
+
+    dRoot.appendChild(dock);
 
     (document.body || document.documentElement).appendChild(hermesHost);
     (document.body || document.documentElement).appendChild(dockHost);
@@ -419,7 +543,7 @@ function initHermesUi() {
     window.addEventListener('hashchange', onLocationMaybeChanged, false);
     window.addEventListener('popstate', onLocationMaybeChanged, false);
 
-    renderTemplateButtons();
+    renderDock();
     fetchTemplatesAndRender();
     startTemplatesRefreshLoop();
     updateThreadDock();

@@ -59,11 +59,17 @@ function initHermesUi() {
   var urlPollId = null;
   var templatesRefreshId = null;
   var lastSeenUrl = location.href;
+  var selectedCategoryStorageKey = 'lichess-gmail.hermes.selectedCategory';
   var templates = [];
   var templatesLoaded = false;
   var templatesLoadError = false;
   var selectedCategory = 'all';
   var categories = [];
+
+  try {
+    var savedCategory = window.localStorage.getItem(selectedCategoryStorageKey);
+    if (savedCategory) selectedCategory = normalizeCategory(savedCategory) || 'all';
+  } catch (e) {}
 
   function normalizeCategory(c) {
     if (typeof c !== 'string') return '';
@@ -76,6 +82,7 @@ function initHermesUi() {
   }
 
   function recomputeCategories() {
+    var previousCategory = selectedCategory;
     var seen = Object.create(null);
     templates.forEach(function(t) {
       var k = normalizeCategory(t && t.category);
@@ -87,6 +94,13 @@ function initHermesUi() {
     if (selectedCategory !== 'all' && categories.indexOf(selectedCategory) === -1) {
       selectedCategory = 'all';
     }
+    if (selectedCategory !== previousCategory) persistSelectedCategory();
+  }
+
+  function persistSelectedCategory() {
+    try {
+      window.localStorage.setItem(selectedCategoryStorageKey, selectedCategory);
+    } catch (e) {}
   }
 
   function stopUrlPoll() {
@@ -220,6 +234,7 @@ function initHermesUi() {
     select.value = selectedCategory;
     select.addEventListener('change', function() {
       selectedCategory = select.value;
+      persistSelectedCategory();
       renderDock();
     });
 

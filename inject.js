@@ -1,3 +1,4 @@
+// Various helpers
 function getSenderEmail() {
   return document.querySelector('tr.acZ span[email]').getAttribute('email');
   // return document.querySelector('img.ajn[jid]').getAttribute('jid');
@@ -85,31 +86,38 @@ function copyTextToClipboard(html) {
   if (backupRange) selection.addRange(backupRange);
 }
 
+function confirmEmail(e) {
+  var email = getSenderEmail();
+  window.open('https://lichess.org/mod/email-confirm?q=' + email);
+  clickReply();
+  extensionStorage().sync.get([SIGNATURE_STORAGE_KEY], function(data) {
+    var html = buildEmailConfirmedHtml(data[SIGNATURE_STORAGE_KEY]);
+    setTimeout(function() {
+      setReply(html);
+      setReplyEmail(REPLY_SEND_AS_EMAIL);
+    }, 100);
+  });
+}
+
+// Entry point for this script
 function load() {
-  function confirmEmail(e) {
-    var email = getSenderEmail();
-    window.open('https://lichess.org/mod/email-confirm?q=' + email);
-    clickReply();
-    extensionStorage().sync.get([SIGNATURE_STORAGE_KEY], function(data) {
-      var html = buildEmailConfirmedHtml(data[SIGNATURE_STORAGE_KEY]);
-      setTimeout(function() {
-        setReply(html);
-        setReplyEmail(REPLY_SEND_AS_EMAIL);
-      }, 100);
-    });
-  }
+  // Insert signature
   Mousetrap.bind('ctrl+shift+e', function(e) {
     e.preventDefault();
     extensionStorage().sync.get([SIGNATURE_STORAGE_KEY], function(data) {
       insertSignature(signatureToHtml(data[SIGNATURE_STORAGE_KEY]));
     });
   });
+  // Confirm email
   Mousetrap.bind('ctrl+,', confirmEmail);
   Mousetrap.bind('ctrl+f', confirmEmail);
+  // Search user
   Mousetrap.bind('ctrl+y', function(e) {
     var email = getSenderEmail();
     window.open('https://lichess.org/mod/search?q=' + email);
   });
+  // Initialize Hermes
+  initHermes();
 }
 
 /**
@@ -131,17 +139,15 @@ function isGmailThreadViewFromUrl() {
   return true;
 }
 
-/**
- * Inject Hermes button + dock. We only touch our own nodes. The dock is fixed to
- * the bottom of the viewport so it survives Gmail layout changes.
- */
-function initHermesUi() {
+// Hermes UI: button + dock fixed to bottom of viewport
+function initHermes() {
   var hermesHostId = 'lichess-gmail-hermes-host';
   var dockHostId = 'lichess-gmail-hermes-dock';
   var templatesApiUrl = 'https://hermes.lichess.app/api/templates';
   var templatesRefreshMs = 6 * 60 * 60 * 1000; // 6 hours
   if (document.getElementById(hermesHostId)) return;
 
+  // Hermes state
   var state = {
     hermesEnabled: false,
     urlPollId: null,
@@ -155,6 +161,7 @@ function initHermesUi() {
   };
   var selectedCategoryStorageKey = 'lichess-gmail.hermes.selectedCategory';
 
+  // State persistence and normalization
   try {
     var savedCategory = window.localStorage.getItem(selectedCategoryStorageKey);
     if (savedCategory) state.selectedCategory = normalizeCategory(savedCategory) || 'all';
@@ -170,6 +177,7 @@ function initHermesUi() {
     return c.charAt(0).toUpperCase() + c.slice(1);
   }
 
+  // Data and category management
   function recomputeCategories() {
     var previousCategory = state.selectedCategory;
     var seen = Object.create(null);
@@ -210,6 +218,7 @@ function initHermesUi() {
     state.urlPollId = setInterval(onLocationMaybeChanged, 900);
   }
 
+  // Reply helpers
   function getReplyEditable() {
     return document.querySelector('div.editable[id][contenteditable][g_editable]');
   }
@@ -249,6 +258,7 @@ function initHermesUi() {
     });
   }
 
+  // Dock rendering helpers
   function getDockParts() {
     var dock = document.getElementById(dockHostId);
     if (!dock || !dock.shadowRoot) return null;
@@ -336,6 +346,7 @@ function initHermesUi() {
     while (n.firstChild) n.removeChild(n.firstChild);
   }
 
+  // Dock rendering
   function renderDock() {
     var parts = getDockParts();
     if (!parts || !parts.templatesRow || !parts.controlsRow) return;
@@ -401,6 +412,7 @@ function initHermesUi() {
     });
   }
 
+  // Template fetching lifecycle
   function fetchTemplatesAndRender() {
     return fetch(templatesApiUrl)
       .then(function(res) {
@@ -427,6 +439,7 @@ function initHermesUi() {
     state.templatesRefreshId = setInterval(fetchTemplatesAndRender, templatesRefreshMs);
   }
 
+  // Visibility, toggle, and navigation events
   function updateThreadDock() {
     var dock = document.getElementById(dockHostId);
     if (!dock) return;
@@ -469,6 +482,7 @@ function initHermesUi() {
     setHermesEnabled(!state.hermesEnabled);
   }
 
+  // DOM mount and startup wiring
   function mount() {
     if (document.getElementById(hermesHostId)) return;
 
@@ -660,4 +674,3 @@ function initHermesUi() {
 }
 
 load();
-initHermesUi();

@@ -482,10 +482,7 @@ function initHermes() {
     setHermesEnabled(!state.hermesEnabled);
   }
 
-  // DOM mount and startup wiring
-  function mount() {
-    if (document.getElementById(hermesHostId)) return;
-
+  function createHermesLauncherButton() {
     var hermesHost = document.createElement('div');
     hermesHost.id = hermesHostId;
     hermesHost.setAttribute('data-lichess-gmail', 'hermes');
@@ -527,17 +524,20 @@ function initHermes() {
       '  color: #1967d2;',
       '}'
     ].join('\n');
-    var hermesBtn = document.createElement('button');
-    hermesBtn.type = 'button';
-    hermesBtn.setAttribute('aria-label', 'Hermes (Ctrl+Shift+G)');
-    hermesBtn.setAttribute('aria-pressed', 'false');
-    hermesBtn.setAttribute('title', 'Turn Hermes message tools on or off (Ctrl+Shift+G)');
-    hermesBtn.appendChild(document.createTextNode('Hermes (Ctrl+Shift+G)'));
-    hermesBtn.addEventListener('click', onHermesClick);
+    var launcherButton = document.createElement('button');
+    launcherButton.type = 'button';
+    launcherButton.setAttribute('aria-label', 'Hermes (Ctrl+Shift+G)');
+    launcherButton.setAttribute('aria-pressed', 'false');
+    launcherButton.setAttribute('title', 'Turn Hermes message tools on or off (Ctrl+Shift+G)');
+    launcherButton.appendChild(document.createTextNode('Hermes (Ctrl+Shift+G)'));
+    launcherButton.addEventListener('click', onHermesClick);
 
     hRoot.appendChild(hStyle);
-    hRoot.appendChild(hermesBtn);
+    hRoot.appendChild(launcherButton);
+    return hermesHost;
+  }
 
+  function createHermesDock() {
     var dockHost = document.createElement('div');
     dockHost.id = dockHostId;
     dockHost.setAttribute('data-lichess-gmail', 'hermes-dock');
@@ -654,6 +654,15 @@ function initHermes() {
     dock.appendChild(controlsRow);
 
     dRoot.appendChild(dock);
+    return dockHost;
+  }
+
+  // DOM mount and startup wiring
+  function mount() {
+    if (document.getElementById(hermesHostId)) return;
+
+    var hermesHost = createHermesLauncherButton();
+    var dockHost = createHermesDock();
 
     (document.body || document.documentElement).appendChild(hermesHost);
     (document.body || document.documentElement).appendChild(dockHost);

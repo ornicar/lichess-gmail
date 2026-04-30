@@ -21,8 +21,8 @@
     "128": "icons/icon128.png"
   },
   "background": {
-    "scripts": ["src/bg/background.js"],
-    "service_worker": "src/bg/background.js"
+    "scripts": ["background.js"],
+    "service_worker": "background.js"
   },
   "permissions": [
     "clipboardRead",

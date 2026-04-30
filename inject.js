@@ -1,3 +1,90 @@
+function getSenderEmail() {
+  return document.querySelector('tr.acZ span[email]').getAttribute('email');
+  // return document.querySelector('img.ajn[jid]').getAttribute('jid');
+}
+
+function clickReply() {
+  const replies = document.querySelectorAll('button[aria-label=Reply] span[jsname][aria-hidden=true]');
+  if (replies.length > 0) replies[replies.length - 1].click();
+}
+
+function sanitizeInjectedHtml(html) {
+  var input = typeof html === 'string' ? html : '';
+  if (typeof DOMPurify === 'undefined' || !DOMPurify.sanitize) {
+    // Fail closed if sanitizer is missing.
+    return '<div>' + escapeHtml(input) + '</div>';
+  }
+
+  var clean = DOMPurify.sanitize(input, {
+    ALLOWED_TAGS: ['a', 'b', 'blockquote', 'br', 'code', 'div', 'em', 'i', 'li', 'ol', 'p', 'pre', 'span', 'strong', 'u', 'ul'],
+    ALLOWED_ATTR: ['href', 'target', 'rel'],
+    ALLOW_DATA_ATTR: false,
+    FORBID_ATTR: ['style'],
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
+  });
+
+  var container = document.createElement('div');
+  container.innerHTML = clean;
+  Array.from(container.querySelectorAll('a[href]')).forEach(function(link) {
+    var href = (link.getAttribute('href') || '').trim();
+    if (!/^(https?:|mailto:)/i.test(href)) {
+      link.removeAttribute('href');
+      return;
+    }
+    if (/^https?:/i.test(href)) link.setAttribute('target', '_blank');
+    link.setAttribute('rel', 'noopener noreferrer nofollow');
+  });
+  return container.innerHTML;
+}
+
+function setReply(html) {
+  document.querySelector('div.editable[id][contenteditable][g_editable]').innerHTML = sanitizeInjectedHtml(html);
+}
+
+function insertSignature(html) {
+  var editable = document.activeElement && document.activeElement.closest
+    ? document.activeElement.closest('div[contenteditable="true"]')
+    : null;
+  if (!editable) editable = document.querySelector('div.editable[id][contenteditable][g_editable]');
+  if (!editable) return;
+  editable.focus();
+  document.execCommand('insertHTML', false, sanitizeInjectedHtml(html));
+}
+
+function setReplyEmail(email) {
+  var el = Array.from(document.querySelectorAll('form span')).find(
+    o => o.textContent === REPLY_SEND_AS_DISPLAY
+  );
+  if (el) el.innerHTML = email;
+}
+
+// <https://stackoverflow.com/a/17644403>
+function copyTextToClipboard(html) {
+  var tmpNode = document.createElement('div');
+  tmpNode.innerHTML = html;
+  document.body.appendChild(tmpNode);
+
+  // Back up previous selection
+  var selection = window.getSelection();
+  var backupRange;
+  if (selection.rangeCount) backupRange = selection.getRangeAt(0).cloneRange();
+
+  // Copy the contents
+  var copyFrom = document.createRange();
+  copyFrom.selectNodeContents(tmpNode);
+  selection.removeAllRanges();
+  selection.addRange(copyFrom);
+  document.execCommand('copy');
+
+  // Clean-up
+  tmpNode.parentNode.removeChild(tmpNode);
+
+  // Restore selection
+  selection = window.getSelection();
+  selection.removeAllRanges();
+  if (backupRange) selection.addRange(backupRange);
+}
+
 function load() {
   function confirmEmail(e) {
     var email = getSenderEmail();
@@ -55,20 +142,22 @@ function initHermesUi() {
   var templatesRefreshMs = 6 * 60 * 60 * 1000; // 6 hours
   if (document.getElementById(hermesHostId)) return;
 
-  var hermesEnabled = false;
-  var urlPollId = null;
-  var templatesRefreshId = null;
-  var lastSeenUrl = location.href;
+  var state = {
+    hermesEnabled: false,
+    urlPollId: null,
+    templatesRefreshId: null,
+    lastSeenUrl: location.href,
+    templates: [],
+    templatesLoaded: false,
+    templatesLoadError: false,
+    selectedCategory: 'all',
+    categories: []
+  };
   var selectedCategoryStorageKey = 'lichess-gmail.hermes.selectedCategory';
-  var templates = [];
-  var templatesLoaded = false;
-  var templatesLoadError = false;
-  var selectedCategory = 'all';
-  var categories = [];
 
   try {
     var savedCategory = window.localStorage.getItem(selectedCategoryStorageKey);
-    if (savedCategory) selectedCategory = normalizeCategory(savedCategory) || 'all';
+    if (savedCategory) state.selectedCategory = normalizeCategory(savedCategory) || 'all';
   } catch (e) {}
 
   function normalizeCategory(c) {
@@ -82,43 +171,43 @@ function initHermesUi() {
   }
 
   function recomputeCategories() {
-    var previousCategory = selectedCategory;
+    var previousCategory = state.selectedCategory;
     var seen = Object.create(null);
-    templates.forEach(function(t) {
+    state.templates.forEach(function(t) {
       var k = normalizeCategory(t && t.category);
       if (k) seen[k] = true;
     });
-    categories = Object.keys(seen).sort(function(a, b) {
+    state.categories = Object.keys(seen).sort(function(a, b) {
       return a.localeCompare(b);
     });
-    if (selectedCategory !== 'all' && categories.indexOf(selectedCategory) === -1) {
-      selectedCategory = 'all';
+    if (state.selectedCategory !== 'all' && state.categories.indexOf(state.selectedCategory) === -1) {
+      state.selectedCategory = 'all';
     }
-    if (selectedCategory !== previousCategory) persistSelectedCategory();
+    if (state.selectedCategory !== previousCategory) persistSelectedCategory();
   }
 
   function persistSelectedCategory() {
     try {
-      window.localStorage.setItem(selectedCategoryStorageKey, selectedCategory);
+      window.localStorage.setItem(selectedCategoryStorageKey, state.selectedCategory);
     } catch (e) {}
   }
 
   function stopUrlPoll() {
-    if (urlPollId != null) {
-      clearInterval(urlPollId);
-      urlPollId = null;
+    if (state.urlPollId != null) {
+      clearInterval(state.urlPollId);
+      state.urlPollId = null;
     }
   }
 
   function onLocationMaybeChanged() {
-    if (location.href === lastSeenUrl) return;
-    lastSeenUrl = location.href;
+    if (location.href === state.lastSeenUrl) return;
+    state.lastSeenUrl = location.href;
     updateThreadDock();
   }
 
   function startUrlPoll() {
-    if (urlPollId != null) return;
-    urlPollId = setInterval(onLocationMaybeChanged, 900);
+    if (state.urlPollId != null) return;
+    state.urlPollId = setInterval(onLocationMaybeChanged, 900);
   }
 
   function getReplyEditable() {
@@ -176,8 +265,8 @@ function initHermesUi() {
     reload.setAttribute('aria-label', 'Reload templates');
     reload.appendChild(document.createTextNode('Reload'));
     reload.addEventListener('click', function() {
-      templatesLoaded = false;
-      templatesLoadError = false;
+      state.templatesLoaded = false;
+      state.templatesLoadError = false;
       renderDock();
       fetchTemplatesAndRender();
     });
@@ -224,16 +313,16 @@ function initHermesUi() {
     allOpt.appendChild(document.createTextNode('All'));
     select.appendChild(allOpt);
 
-    categories.forEach(function(c) {
+    state.categories.forEach(function(c) {
       var opt = document.createElement('option');
       opt.value = c;
       opt.appendChild(document.createTextNode(formatCategoryLabel(c)));
       select.appendChild(opt);
     });
 
-    select.value = selectedCategory;
+    select.value = state.selectedCategory;
     select.addEventListener('change', function() {
-      selectedCategory = select.value;
+      state.selectedCategory = select.value;
       persistSelectedCategory();
       renderDock();
     });
@@ -258,7 +347,7 @@ function initHermesUi() {
     appendUtilityButtons(parts.controlsRow);
     appendCollapseButton(parts.controlsRow);
 
-    if (!templatesLoaded && !templatesLoadError) {
+    if (!state.templatesLoaded && !state.templatesLoadError) {
       var loading = document.createElement('span');
       loading.className = 'status';
       loading.appendChild(document.createTextNode('Loading templates...'));
@@ -266,7 +355,7 @@ function initHermesUi() {
       return;
     }
 
-    if (templatesLoadError) {
+    if (state.templatesLoadError) {
       var error = document.createElement('span');
       error.className = 'status';
       error.appendChild(document.createTextNode('Could not load templates'));
@@ -274,7 +363,7 @@ function initHermesUi() {
       return;
     }
 
-    if (!templates.length) {
+    if (!state.templates.length) {
       var empty = document.createElement('span');
       empty.className = 'status';
       empty.appendChild(document.createTextNode('No templates available'));
@@ -282,9 +371,9 @@ function initHermesUi() {
       return;
     }
 
-    var filtered = templates.filter(function(t) {
-      if (selectedCategory === 'all') return true;
-      return normalizeCategory(t && t.category) === selectedCategory;
+    var filtered = state.templates.filter(function(t) {
+      if (state.selectedCategory === 'all') return true;
+      return normalizeCategory(t && t.category) === state.selectedCategory;
     });
 
     if (!filtered.length) {
@@ -320,29 +409,29 @@ function initHermesUi() {
       })
       .then(function(payload) {
         var next = payload && Array.isArray(payload.templates) ? payload.templates : [];
-        templates = next;
-        templatesLoaded = true;
-        templatesLoadError = false;
+        state.templates = next;
+        state.templatesLoaded = true;
+        state.templatesLoadError = false;
         recomputeCategories();
         renderDock();
       })
       .catch(function() {
-        templatesLoaded = true;
-        templatesLoadError = true;
+        state.templatesLoaded = true;
+        state.templatesLoadError = true;
         renderDock();
       });
   }
 
   function startTemplatesRefreshLoop() {
-    if (templatesRefreshId != null) return;
-    templatesRefreshId = setInterval(fetchTemplatesAndRender, templatesRefreshMs);
+    if (state.templatesRefreshId != null) return;
+    state.templatesRefreshId = setInterval(fetchTemplatesAndRender, templatesRefreshMs);
   }
 
   function updateThreadDock() {
     var dock = document.getElementById(dockHostId);
     if (!dock) return;
     var isThreadView = isGmailThreadViewFromUrl();
-    var on = hermesEnabled && isThreadView;
+    var on = state.hermesEnabled && isThreadView;
     dock.style.display = on ? 'block' : 'none';
     dock.setAttribute('aria-hidden', on ? 'false' : 'true');
     updateHermesLauncherVisibility(isThreadView);
@@ -352,32 +441,32 @@ function initHermesUi() {
     var h = document.getElementById(hermesHostId);
     if (!h) return;
     var threadView = typeof isThreadView === 'boolean' ? isThreadView : isGmailThreadViewFromUrl();
-    var showLauncher = threadView && !hermesEnabled;
+    var showLauncher = threadView && !state.hermesEnabled;
     h.style.display = showLauncher ? 'block' : 'none';
     h.setAttribute('aria-hidden', showLauncher ? 'false' : 'true');
   }
 
   function setHermesEnabled(next) {
-    hermesEnabled = next;
-    lastSeenUrl = location.href;
+    state.hermesEnabled = next;
+    state.lastSeenUrl = location.href;
     var h = document.getElementById(hermesHostId);
     if (h && h.shadowRoot) {
       var b = h.shadowRoot.querySelector('button');
-      if (b) b.setAttribute('aria-pressed', hermesEnabled ? 'true' : 'false');
+      if (b) b.setAttribute('aria-pressed', state.hermesEnabled ? 'true' : 'false');
     }
     updateHermesLauncherVisibility();
-    if (hermesEnabled) startUrlPoll();
+    if (state.hermesEnabled) startUrlPoll();
     else stopUrlPoll();
     updateThreadDock();
   }
 
   function onHermesClick() {
-    setHermesEnabled(!hermesEnabled);
+    setHermesEnabled(!state.hermesEnabled);
   }
 
   function toggleHermesEnabledWithShortcut(e) {
     if (e && e.preventDefault) e.preventDefault();
-    setHermesEnabled(!hermesEnabled);
+    setHermesEnabled(!state.hermesEnabled);
   }
 
   function mount() {
@@ -572,90 +661,3 @@ function initHermesUi() {
 
 load();
 initHermesUi();
-
-function getSenderEmail() {
-  return document.querySelector('tr.acZ span[email]').getAttribute('email');
-  // return document.querySelector('img.ajn[jid]').getAttribute('jid');
-}
-
-function clickReply() {
-  const replies = document.querySelectorAll('button[aria-label=Reply] span[jsname][aria-hidden=true]');
-  if (replies.length > 0) replies[replies.length - 1].click();
-}
-
-function sanitizeInjectedHtml(html) {
-  var input = typeof html === 'string' ? html : '';
-  if (typeof DOMPurify === 'undefined' || !DOMPurify.sanitize) {
-    // Fail closed if sanitizer is missing.
-    return '<div>' + escapeHtml(input) + '</div>';
-  }
-
-  var clean = DOMPurify.sanitize(input, {
-    ALLOWED_TAGS: ['a', 'b', 'blockquote', 'br', 'code', 'div', 'em', 'i', 'li', 'ol', 'p', 'pre', 'span', 'strong', 'u', 'ul'],
-    ALLOWED_ATTR: ['href', 'target', 'rel'],
-    ALLOW_DATA_ATTR: false,
-    FORBID_ATTR: ['style'],
-    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
-  });
-
-  var container = document.createElement('div');
-  container.innerHTML = clean;
-  Array.from(container.querySelectorAll('a[href]')).forEach(function(link) {
-    var href = (link.getAttribute('href') || '').trim();
-    if (!/^(https?:|mailto:)/i.test(href)) {
-      link.removeAttribute('href');
-      return;
-    }
-    if (/^https?:/i.test(href)) link.setAttribute('target', '_blank');
-    link.setAttribute('rel', 'noopener noreferrer nofollow');
-  });
-  return container.innerHTML;
-}
-
-function setReply(html) {
-  document.querySelector('div.editable[id][contenteditable][g_editable]').innerHTML = sanitizeInjectedHtml(html);
-}
-
-function insertSignature(html) {
-  var editable = document.activeElement && document.activeElement.closest
-    ? document.activeElement.closest('div[contenteditable="true"]')
-    : null;
-  if (!editable) editable = document.querySelector('div.editable[id][contenteditable][g_editable]');
-  if (!editable) return;
-  editable.focus();
-  document.execCommand('insertHTML', false, sanitizeInjectedHtml(html));
-}
-
-function setReplyEmail(email) {
-  var el = Array.from(document.querySelectorAll('form span')).find(
-    o => o.textContent === REPLY_SEND_AS_DISPLAY
-  );
-  if (el) el.innerHTML = email;
-}
-
-// <https://stackoverflow.com/a/17644403>
-function copyTextToClipboard(html) {
-  var tmpNode = document.createElement('div');
-  tmpNode.innerHTML = html;
-  document.body.appendChild(tmpNode);
-
-  // Back up previous selection
-  var selection = window.getSelection();
-  var backupRange;
-  if (selection.rangeCount) backupRange = selection.getRangeAt(0).cloneRange();
-
-  // Copy the contents
-  var copyFrom = document.createRange();
-  copyFrom.selectNodeContents(tmpNode);
-  selection.removeAllRanges();
-  selection.addRange(copyFrom);
-  document.execCommand('copy');
-
-  // Clean-up
-  tmpNode.parentNode.removeChild(tmpNode);
-
-  // Restore selection
-  selection = window.getSelection();
-  selection.removeAllRanges();
-  if (backupRange) selection.addRange(backupRange);
-}

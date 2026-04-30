@@ -583,8 +583,37 @@ function clickReply() {
   if (replies.length > 0) replies[replies.length - 1].click();
 }
 
+function sanitizeInjectedHtml(html) {
+  var input = typeof html === 'string' ? html : '';
+  if (typeof DOMPurify === 'undefined' || !DOMPurify.sanitize) {
+    // Fail closed if sanitizer is missing.
+    return '<div>' + escapeHtml(input) + '</div>';
+  }
+
+  var clean = DOMPurify.sanitize(input, {
+    ALLOWED_TAGS: ['a', 'b', 'blockquote', 'br', 'code', 'div', 'em', 'i', 'li', 'ol', 'p', 'pre', 'span', 'strong', 'u', 'ul'],
+    ALLOWED_ATTR: ['href', 'target', 'rel'],
+    ALLOW_DATA_ATTR: false,
+    FORBID_ATTR: ['style'],
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
+  });
+
+  var container = document.createElement('div');
+  container.innerHTML = clean;
+  Array.from(container.querySelectorAll('a[href]')).forEach(function(link) {
+    var href = (link.getAttribute('href') || '').trim();
+    if (!/^(https?:|mailto:)/i.test(href)) {
+      link.removeAttribute('href');
+      return;
+    }
+    if (/^https?:/i.test(href)) link.setAttribute('target', '_blank');
+    link.setAttribute('rel', 'noopener noreferrer nofollow');
+  });
+  return container.innerHTML;
+}
+
 function setReply(html) {
-  document.querySelector('div.editable[id][contenteditable][g_editable]').innerHTML = html;
+  document.querySelector('div.editable[id][contenteditable][g_editable]').innerHTML = sanitizeInjectedHtml(html);
 }
 
 function insertSignature(html) {
@@ -594,7 +623,7 @@ function insertSignature(html) {
   if (!editable) editable = document.querySelector('div.editable[id][contenteditable][g_editable]');
   if (!editable) return;
   editable.focus();
-  document.execCommand('insertHTML', false, html);
+  document.execCommand('insertHTML', false, sanitizeInjectedHtml(html));
 }
 
 function setReplyEmail(email) {

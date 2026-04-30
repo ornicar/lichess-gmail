@@ -1,4 +1,4 @@
-// Shared by Gmail inject, options page, and popup — load this file before other extension scripts.
+// Code common to inject.js, options.js, and popup.js
 
 var DEFAULT_SIGNATURE = '--\nRegards,\nLichess team';
 var SIGNATURE_STORAGE_KEY = 'customSignature';

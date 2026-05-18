@@ -171,7 +171,8 @@ function initHermes() {
     templatesLoaded: false,
     templatesLoadError: false,
     selectedCategory: 'all',
-    categories: []
+    categories: [],
+    shortcutsVisible: false
   };
   var selectedCategoryStorageKey = 'lichess-gmail.hermes.selectedCategory';
 
@@ -278,8 +279,58 @@ function initHermes() {
     if (!dock || !dock.shadowRoot) return null;
     return {
       templatesRow: dock.shadowRoot.querySelector('.templatesRow'),
-      controlsRow: dock.shadowRoot.querySelector('.controlsRow')
+      controlsRow: dock.shadowRoot.querySelector('.controlsRow'),
+      shortcutsPanel: dock.shadowRoot.getElementById('lichess-gmail-shortcuts-panel')
     };
+  }
+
+  function syncShortcutsPanel(parts) {
+    if (!parts) return;
+    var panel = parts.shortcutsPanel;
+    if (panel) {
+      if (state.shortcutsVisible) panel.removeAttribute('hidden');
+      else panel.setAttribute('hidden', '');
+    }
+    var btn = parts.controlsRow && parts.controlsRow.querySelector('#lichess-gmail-shortcuts-toggle');
+    if (btn) {
+      btn.setAttribute('aria-expanded', state.shortcutsVisible ? 'true' : 'false');
+      while (btn.firstChild) btn.removeChild(btn.firstChild);
+      btn.appendChild(document.createTextNode(state.shortcutsVisible ? 'Hide shortcuts' : 'Shortcuts'));
+    }
+  }
+
+  function appendShortcutRow(container, keyLabels, description) {
+    var row = document.createElement('div');
+    row.className = 'shortcutRow';
+    var keys = document.createElement('span');
+    keys.className = 'shortcutKeys';
+    keyLabels.forEach(function(label, i) {
+      if (i > 0) keys.appendChild(document.createTextNode(' or '));
+      var kbd = document.createElement('kbd');
+      kbd.appendChild(document.createTextNode(label));
+      keys.appendChild(kbd);
+    });
+    var desc = document.createElement('span');
+    desc.className = 'shortcutDesc';
+    desc.appendChild(document.createTextNode(description));
+    row.appendChild(keys);
+    row.appendChild(desc);
+    container.appendChild(row);
+  }
+
+  function fillShortcutsPanel(panel) {
+    if (!panel || panel.getAttribute('data-filled') === '1') return;
+    panel.setAttribute('data-filled', '1');
+    var title = document.createElement('div');
+    title.className = 'shortcutsTitle';
+    title.appendChild(document.createTextNode('Keyboard shortcuts'));
+    panel.appendChild(title);
+    appendShortcutRow(panel, ['Ctrl+Shift+G'], 'Show/hide Hermes dock');
+    appendShortcutRow(panel, ['Ctrl+Shift+E'], 'Insert your configured signature');
+    appendShortcutRow(panel, ['Ctrl+Y', 'Ctrl+F'], 'Open mod search with sender email');
+    appendShortcutRow(panel, ['Ctrl+Shift+F'], 'Open profile for username in selection');
+    appendShortcutRow(panel, ['Ctrl+,'], 'Confirm email (legacy)');
+    appendShortcutRow(panel, ['Right-click menu'], 'If selected text is an email open mod search, else open profile.');
   }
 
   function appendUtilityButtons(row) {
@@ -305,6 +356,20 @@ function initHermes() {
       window.open('https://hermes.lichess.app/admin', '_blank', 'noopener,noreferrer');
     });
     row.appendChild(edit);
+
+    var shortcutsToggle = document.createElement('button');
+    shortcutsToggle.type = 'button';
+    shortcutsToggle.id = 'lichess-gmail-shortcuts-toggle';
+    shortcutsToggle.className = 'utility';
+    shortcutsToggle.setAttribute('aria-expanded', 'false');
+    shortcutsToggle.setAttribute('aria-controls', 'lichess-gmail-shortcuts-panel');
+    shortcutsToggle.setAttribute('aria-label', 'Show or hide keyboard shortcuts');
+    shortcutsToggle.appendChild(document.createTextNode('Shortcuts'));
+    shortcutsToggle.addEventListener('click', function() {
+      state.shortcutsVisible = !state.shortcutsVisible;
+      syncShortcutsPanel(getDockParts());
+    });
+    row.appendChild(shortcutsToggle);
   }
 
   function appendCollapseButton(row) {
@@ -371,6 +436,7 @@ function initHermes() {
     appendCategorySelector(parts.controlsRow);
     appendUtilityButtons(parts.controlsRow);
     appendCollapseButton(parts.controlsRow);
+    syncShortcutsPanel(parts);
 
     if (!state.templatesLoaded && !state.templatesLoadError) {
       var loading = document.createElement('span');
@@ -662,6 +728,48 @@ function initHermes() {
       '  color: #5f6368;',
       '  font-size: 12px;',
       '  padding: 0 4px;',
+      '}',
+      '.shortcutsPanel {',
+      '  box-sizing: border-box;',
+      '  width: 100%;',
+      '  padding: 8px 10px;',
+      '  border-top: 1px solid rgba(60,64,67,0.12);',
+      '  background: #f8f9fa;',
+      '  max-height: 40vh;',
+      '  overflow: auto;',
+      '}',
+      '.shortcutsPanel[hidden] {',
+      '  display: none !important;',
+      '}',
+      '.shortcutsTitle {',
+      '  font-weight: 600;',
+      '  color: #202124;',
+      '  margin-bottom: 8px;',
+      '}',
+      '.shortcutRow {',
+      '  display: flex;',
+      '  flex-direction: row;',
+      '  flex-wrap: wrap;',
+      '  align-items: baseline;',
+      '  gap: 8px 12px;',
+      '  margin-bottom: 6px;',
+      '}',
+      '.shortcutKeys {',
+      '  flex: 0 0 auto;',
+      '  min-width: 10.5rem;',
+      '}',
+      '.shortcutKeys kbd {',
+      '  font: 11px/1.2 ui-monospace, Menlo, Consolas, monospace;',
+      '  padding: 2px 6px;',
+      '  border-radius: 4px;',
+      '  background: #e8eaed;',
+      '  border: 1px solid rgba(60,64,67,0.2);',
+      '  white-space: nowrap;',
+      '}',
+      '.shortcutDesc {',
+      '  flex: 1 1 12rem;',
+      '  color: #5f6368;',
+      '  font-size: 12px;',
       '}'
     ].join('\n');
     dRoot.appendChild(dStyle);
@@ -675,6 +783,15 @@ function initHermes() {
     var controlsRow = document.createElement('div');
     controlsRow.className = 'controlsRow';
     dock.appendChild(controlsRow);
+
+    var shortcutsPanel = document.createElement('div');
+    shortcutsPanel.id = 'lichess-gmail-shortcuts-panel';
+    shortcutsPanel.className = 'shortcutsPanel';
+    shortcutsPanel.setAttribute('role', 'region');
+    shortcutsPanel.setAttribute('aria-label', 'Keyboard shortcuts');
+    if (!state.shortcutsVisible) shortcutsPanel.setAttribute('hidden', '');
+    fillShortcutsPanel(shortcutsPanel);
+    dock.appendChild(shortcutsPanel);
 
     dRoot.appendChild(dock);
     return dockHost;

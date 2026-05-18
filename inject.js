@@ -87,6 +87,7 @@ function copyTextToClipboard(html) {
 }
 
 function confirmEmail(e) {
+  if (e && e.preventDefault) e.preventDefault();
   var email = getSenderEmail();
   window.open('https://lichess.org/mod/email-confirm?q=' + email);
   clickReply();
@@ -97,6 +98,20 @@ function confirmEmail(e) {
       setReplyEmail(REPLY_SEND_AS_EMAIL);
     }, 100);
   });
+}
+
+function searchSender(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  var email = getSenderEmail();
+  window.open('https://lichess.org/mod/search?q=' + email);
+}
+
+function openProfileFromSelection(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  var text = window.getSelection().toString();
+  if (!text) return;
+  var m = text.match(/[a-z0-9][\w-]*[a-z0-9]/i);
+  if (m) window.open('https://lichess.org/@/' + m[0] + '?mod');
 }
 
 // Entry point for this script
@@ -110,12 +125,11 @@ function load() {
   });
   // Confirm email
   Mousetrap.bind('ctrl+,', confirmEmail);
-  Mousetrap.bind('ctrl+f', confirmEmail);
-  // Search user
-  Mousetrap.bind('ctrl+y', function(e) {
-    var email = getSenderEmail();
-    window.open('https://lichess.org/mod/search?q=' + email);
-  });
+  // Search for user by email
+  Mousetrap.bind('ctrl+y', searchSender);
+  Mousetrap.bind('ctrl+f', searchSender);
+  // Open profile for selected username
+  Mousetrap.bind('ctrl+shift+f', openProfileFromSelection);
   // Initialize Hermes
   initHermes();
 }

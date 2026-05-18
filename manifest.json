@@ -31,6 +31,12 @@
     "storage",
     "tabs"
   ],
+  "web_accessible_resources": [
+    {
+      "resources": ["styles.css"],
+      "matches": ["https://mail.google.com/*"]
+    }
+  ],
   "content_scripts": [
     {
       "matches": ["https://mail.google.com/mail/*"],

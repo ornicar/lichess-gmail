@@ -12,7 +12,8 @@ function extensionStorage() {
 }
 
 function extensionRuntime() {
-  return (typeof chrome !== 'undefined' && chrome.runtime) ? chrome : browser;
+  if (typeof chrome !== 'undefined' && chrome.runtime) return chrome.runtime;
+  return browser.runtime;
 }
 
 function escapeHtml(text) {

@@ -28,13 +28,17 @@ Toggles the Hermes UI on/off in the Gmail thread view.
 
 Inserts your configured email signature at the cursor in the current email text area.
 
-#### `Ctrl+y`
+#### `Ctrl+y` or `Ctrl+f`
 
 Opens lichess search user page, with the sender email.
 
-#### `Ctrl+,` or `Ctrl+F`
+#### `Ctrl+Shift+F`
 
-For email confirmation requests. This shortcut:
+Opens the profile mod view of the selected Lichess username. Double clicking the text then pressing this shortcut is a fast way to get to a profile page.
+
+#### `Ctrl+,`
+
+An old feature, for when we did email confirmation requests manually. This shortcut:
 
 - opens the [lichess email confirmation UI](https://github.com/ornicar/lila/wiki/Handling-email-address-confirmation) in a new tab, with the email loaded
 - prepares a gmail reply with the corresponding canned response, in case the email confirmation succeeded

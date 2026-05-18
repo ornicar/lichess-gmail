@@ -1,10 +1,9 @@
 // Various helpers
-function getSenderEmail() {
-  return document.querySelector('tr.acZ span[email]').getAttribute('email');
-  // return document.querySelector('img.ajn[jid]').getAttribute('jid');
-}
+const getSenderEmail = () =>
+  document.querySelector('tr.acZ span[email]').getAttribute('email');
+// document.querySelector('img.ajn[jid]').getAttribute('jid');
 
-function clickReply() {
+const clickReply = () => {
   const replies = document.querySelectorAll('button[aria-label=Reply] span[jsname][aria-hidden=true]');
   if (replies.length > 0) replies[replies.length - 1].click();
 }
@@ -26,7 +25,7 @@ function sanitizeInjectedHtml(html) {
 
   var container = document.createElement('div');
   container.innerHTML = clean;
-  Array.from(container.querySelectorAll('a[href]')).forEach(function(link) {
+  Array.from(container.querySelectorAll('a[href]')).forEach((link) => {
     var href = (link.getAttribute('href') || '').trim();
     if (!/^(https?:|mailto:)/i.test(href)) {
       link.removeAttribute('href');
@@ -38,26 +37,23 @@ function sanitizeInjectedHtml(html) {
   return container.innerHTML;
 }
 
-function setReply(html) {
+const setReply = (html) => {
   document.querySelector('div.editable[id][contenteditable][g_editable]').innerHTML = sanitizeInjectedHtml(html);
-}
+};
 
-function insertSignature(html) {
-  var editable = document.activeElement && document.activeElement.closest
-    ? document.activeElement.closest('div[contenteditable="true"]')
-    : null;
-  if (!editable) editable = document.querySelector('div.editable[id][contenteditable][g_editable]');
+const insertSignature = (html) => {
+  var editable =
+    document.activeElement?.closest?.('div[contenteditable="true"]') ||
+    document.querySelector('div.editable[id][contenteditable][g_editable]');
   if (!editable) return;
   editable.focus();
   document.execCommand('insertHTML', false, sanitizeInjectedHtml(html));
-}
+};
 
-function setReplyEmail(email) {
-  var el = Array.from(document.querySelectorAll('form span')).find(
-    o => o.textContent === REPLY_SEND_AS_DISPLAY
-  );
+const setReplyEmail = (email) => {
+  var el = Array.from(document.querySelectorAll('form span')).find((o) => o.textContent === REPLY_SEND_AS_DISPLAY);
   if (el) el.innerHTML = email;
-}
+};
 
 // <https://stackoverflow.com/a/17644403>
 function copyTextToClipboard(html) {
@@ -87,6 +83,7 @@ function copyTextToClipboard(html) {
 }
 
 function confirmEmail(e) {
+  e?.preventDefault?.();
   var email = getSenderEmail();
   window.open('https://lichess.org/mod/email-confirm?q=' + email);
   clickReply();
@@ -99,6 +96,18 @@ function confirmEmail(e) {
   });
 }
 
+function searchSender(e) {
+  e?.preventDefault?.();
+  var email = getSenderEmail();
+  window.open('https://lichess.org/mod/search?q=' + email);
+}
+
+const openProfileFromSelection = (e) => {
+  e?.preventDefault?.();
+  var m = window.getSelection().toString().match(/[a-z0-9][\w-]*[a-z0-9]/i);
+  if (m) window.open('https://lichess.org/@/' + m[0] + '?mod');
+};
+
 // Entry point for this script
 function load() {
   // Insert signature
@@ -110,12 +119,11 @@ function load() {
   });
   // Confirm email
   Mousetrap.bind('ctrl+,', confirmEmail);
-  Mousetrap.bind('ctrl+f', confirmEmail);
-  // Search user
-  Mousetrap.bind('ctrl+y', function(e) {
-    var email = getSenderEmail();
-    window.open('https://lichess.org/mod/search?q=' + email);
-  });
+  // Search for user by email
+  Mousetrap.bind('ctrl+y', searchSender);
+  Mousetrap.bind('ctrl+f', searchSender);
+  // Open profile for selected username
+  Mousetrap.bind('ctrl+shift+f', openProfileFromSelection);
   // Initialize Hermes
   initHermes();
 }
@@ -128,15 +136,16 @@ function load() {
 function isGmailThreadViewFromUrl() {
   var h = (location.hash || '').replace(/^#/, '');
   if (!h) return false;
-  var parts = h.split('/').map(function (p) {
+  var parts = h.split('/').map((p) => {
     try { return decodeURIComponent(p); } catch (e) { return p; }
   });
   if (parts.length < 2) return false;
   var last = (parts[parts.length - 1] || '').trim();
-  if (last.length < 8) return false;
-  if (!/^[0-9A-Za-z_\-+]+$/.test(last)) return false;
-  if (/^(compose|p\d+)$/i.test(last)) return false;
-  return true;
+  return (
+    last.length >= 8 &&
+    /^[0-9A-Za-z_\-+]+$/.test(last) &&
+    !/^(compose|p\d+)$/i.test(last)
+  );
 }
 
 // Hermes UI: button + dock fixed to bottom of viewport
@@ -157,9 +166,20 @@ function initHermes() {
     templatesLoaded: false,
     templatesLoadError: false,
     selectedCategory: 'all',
-    categories: []
+    categories: [],
+    shortcutsVisible: false
   };
   var selectedCategoryStorageKey = 'lichess-gmail.hermes.selectedCategory';
+
+  const normalizeCategory = (c) => typeof(c) === 'string' ? c.trim().toLowerCase() : '';
+  const formatCategoryLabel = (c) => (!c ? 'Uncategorized' : c.charAt(0).toUpperCase() + c.slice(1));
+
+  function appendHermesStylesheet(shadowRoot) {
+    var link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = extensionRuntime().getURL('styles.css');
+    shadowRoot.appendChild(link);
+  }
 
   // State persistence and normalization
   try {
@@ -167,27 +187,15 @@ function initHermes() {
     if (savedCategory) state.selectedCategory = normalizeCategory(savedCategory) || 'all';
   } catch (e) {}
 
-  function normalizeCategory(c) {
-    if (typeof c !== 'string') return '';
-    return c.trim().toLowerCase();
-  }
-
-  function formatCategoryLabel(c) {
-    if (!c) return 'Uncategorized';
-    return c.charAt(0).toUpperCase() + c.slice(1);
-  }
-
   // Data and category management
   function recomputeCategories() {
     var previousCategory = state.selectedCategory;
     var seen = Object.create(null);
-    state.templates.forEach(function(t) {
+    state.templates.forEach((t) => {
       var k = normalizeCategory(t && t.category);
       if (k) seen[k] = true;
     });
-    state.categories = Object.keys(seen).sort(function(a, b) {
-      return a.localeCompare(b);
-    });
+    state.categories = Object.keys(seen).sort((a, b) => a.localeCompare(b));
     if (state.selectedCategory !== 'all' && state.categories.indexOf(state.selectedCategory) === -1) {
       state.selectedCategory = 'all';
     }
@@ -219,9 +227,8 @@ function initHermes() {
   }
 
   // Reply helpers
-  function getReplyEditable() {
-    return document.querySelector('div.editable[id][contenteditable][g_editable]');
-  }
+  const getReplyEditable = () =>
+    document.querySelector('div.editable[id][contenteditable][g_editable]');
 
   function withSignatureIfNeeded(template, done) {
     var body = (template && typeof template.body === 'string') ? template.body : '';
@@ -264,8 +271,57 @@ function initHermes() {
     if (!dock || !dock.shadowRoot) return null;
     return {
       templatesRow: dock.shadowRoot.querySelector('.templatesRow'),
-      controlsRow: dock.shadowRoot.querySelector('.controlsRow')
+      controlsRow: dock.shadowRoot.querySelector('.controlsRow'),
+      shortcutsPanel: dock.shadowRoot.getElementById('lichess-gmail-shortcuts-panel')
     };
+  }
+
+  function syncShortcutsPanel(parts) {
+    if (!parts) return;
+    var panel = parts.shortcutsPanel;
+    if (panel) {
+      state.shortcutsVisible ? panel.removeAttribute('hidden') : panel.setAttribute('hidden', '');
+    }
+    var btn = parts.controlsRow && parts.controlsRow.querySelector('#lichess-gmail-shortcuts-toggle');
+    if (btn) {
+      btn.setAttribute('aria-expanded', state.shortcutsVisible ? 'true' : 'false');
+      while (btn.firstChild) btn.removeChild(btn.firstChild);
+      btn.appendChild(document.createTextNode(state.shortcutsVisible ? 'Hide shortcuts' : 'Shortcuts'));
+    }
+  }
+
+  function appendShortcutRow(container, keyLabels, description) {
+    var row = document.createElement('div');
+    row.className = 'shortcutRow';
+    var keys = document.createElement('span');
+    keys.className = 'shortcutKeys';
+    keyLabels.forEach((label, i) => {
+      if (i > 0) keys.appendChild(document.createTextNode(' or '));
+      var kbd = document.createElement('kbd');
+      kbd.appendChild(document.createTextNode(label));
+      keys.appendChild(kbd);
+    });
+    var desc = document.createElement('span');
+    desc.className = 'shortcutDesc';
+    desc.appendChild(document.createTextNode(description));
+    row.appendChild(keys);
+    row.appendChild(desc);
+    container.appendChild(row);
+  }
+
+  function fillShortcutsPanel(panel) {
+    if (!panel || panel.getAttribute('data-filled') === '1') return;
+    panel.setAttribute('data-filled', '1');
+    var title = document.createElement('div');
+    title.className = 'shortcutsTitle';
+    title.appendChild(document.createTextNode('Keyboard shortcuts'));
+    panel.appendChild(title);
+    appendShortcutRow(panel, ['Ctrl+Shift+G'], 'Show/hide Hermes dock');
+    appendShortcutRow(panel, ['Ctrl+Shift+E'], 'Insert your configured signature');
+    appendShortcutRow(panel, ['Ctrl+Y', 'Ctrl+F'], 'Open mod search with sender email');
+    appendShortcutRow(panel, ['Ctrl+Shift+F'], 'Open profile for username in selection');
+    appendShortcutRow(panel, ['Ctrl+,'], 'Confirm email (legacy)');
+    appendShortcutRow(panel, ['Right-click menu'], 'If selected text is an email open mod search, else open profile.');
   }
 
   function appendUtilityButtons(row) {
@@ -291,6 +347,20 @@ function initHermes() {
       window.open('https://hermes.lichess.app/admin', '_blank', 'noopener,noreferrer');
     });
     row.appendChild(edit);
+
+    var shortcutsToggle = document.createElement('button');
+    shortcutsToggle.type = 'button';
+    shortcutsToggle.id = 'lichess-gmail-shortcuts-toggle';
+    shortcutsToggle.className = 'utility';
+    shortcutsToggle.setAttribute('aria-expanded', 'false');
+    shortcutsToggle.setAttribute('aria-controls', 'lichess-gmail-shortcuts-panel');
+    shortcutsToggle.setAttribute('aria-label', 'Show or hide keyboard shortcuts');
+    shortcutsToggle.appendChild(document.createTextNode('Shortcuts'));
+    shortcutsToggle.addEventListener('click', function() {
+      state.shortcutsVisible = !state.shortcutsVisible;
+      syncShortcutsPanel(getDockParts());
+    });
+    row.appendChild(shortcutsToggle);
   }
 
   function appendCollapseButton(row) {
@@ -323,7 +393,7 @@ function initHermes() {
     allOpt.appendChild(document.createTextNode('All'));
     select.appendChild(allOpt);
 
-    state.categories.forEach(function(c) {
+    state.categories.forEach((c) => {
       var opt = document.createElement('option');
       opt.value = c;
       opt.appendChild(document.createTextNode(formatCategoryLabel(c)));
@@ -341,10 +411,9 @@ function initHermes() {
     row.appendChild(wrap);
   }
 
-  function clearNode(n) {
-    if (!n) return;
-    while (n.firstChild) n.removeChild(n.firstChild);
-  }
+  const clearNode = (n) => {
+    while (n && n.firstChild) n.removeChild(n.firstChild);
+  };
 
   // Dock rendering
   function renderDock() {
@@ -357,6 +426,7 @@ function initHermes() {
     appendCategorySelector(parts.controlsRow);
     appendUtilityButtons(parts.controlsRow);
     appendCollapseButton(parts.controlsRow);
+    syncShortcutsPanel(parts);
 
     if (!state.templatesLoaded && !state.templatesLoadError) {
       var loading = document.createElement('span');
@@ -382,10 +452,10 @@ function initHermes() {
       return;
     }
 
-    var filtered = state.templates.filter(function(t) {
-      if (state.selectedCategory === 'all') return true;
-      return normalizeCategory(t && t.category) === state.selectedCategory;
-    });
+    var filtered = state.templates.filter(
+      (t) =>
+        state.selectedCategory === 'all' || normalizeCategory(t && t.category) === state.selectedCategory
+    );
 
     if (!filtered.length) {
       var none = document.createElement('span');
@@ -395,7 +465,7 @@ function initHermes() {
       return;
     }
 
-    filtered.forEach(function(template) {
+    filtered.forEach((template) => {
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'templateChip';
@@ -405,7 +475,7 @@ function initHermes() {
       b.setAttribute('aria-label', name);
       b.setAttribute('title', name);
       b.appendChild(document.createTextNode(name));
-      b.addEventListener('click', function() {
+      b.addEventListener('click', () => {
         applyTemplateHtmlToReply(template);
       });
       parts.templatesRow.appendChild(b);
@@ -415,11 +485,11 @@ function initHermes() {
   // Template fetching lifecycle
   function fetchTemplatesAndRender() {
     return fetch(templatesApiUrl)
-      .then(function(res) {
+      .then((res) => {
         if (!res.ok) throw new Error('Bad status ' + res.status);
         return res.json();
       })
-      .then(function(payload) {
+      .then((payload) => {
         var next = payload && Array.isArray(payload.templates) ? payload.templates : [];
         state.templates = next;
         state.templatesLoaded = true;
@@ -427,7 +497,7 @@ function initHermes() {
         recomputeCategories();
         renderDock();
       })
-      .catch(function() {
+      .catch(() => {
         state.templatesLoaded = true;
         state.templatesLoadError = true;
         renderDock();
@@ -478,7 +548,7 @@ function initHermes() {
   }
 
   function toggleHermesEnabledWithShortcut(e) {
-    if (e && e.preventDefault) e.preventDefault();
+    e?.preventDefault?.();
     setHermesEnabled(!state.hermesEnabled);
   }
 
@@ -502,28 +572,7 @@ function initHermes() {
     ].join('; ');
 
     var hRoot = hermesHost.attachShadow({ mode: 'open' });
-    var hStyle = document.createElement('style');
-    hStyle.textContent = [
-      ':host { display: block; }',
-      'button {',
-      '  font: 12px/1.2 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;',
-      '  margin: 0 8px 8px 0;',
-      '  padding: 6px 12px;',
-      '  color: #202124;',
-      '  background: #fff;',
-      '  border: 1px solid rgba(60,64,67,0.28);',
-      '  border-radius: 6px;',
-      '  box-shadow: 0 1px 2px rgba(60,64,67,0.15), 0 1px 1px rgba(60,64,67,0.1);',
-      '  cursor: pointer;',
-      '  user-select: none;',
-      '  -webkit-user-select: none;',
-      '}',
-      'button[aria-pressed="true"] {',
-      '  background: #e8f0fe;',
-      '  border-color: #1a73e8;',
-      '  color: #1967d2;',
-      '}'
-    ].join('\n');
+    appendHermesStylesheet(hRoot);
     var launcherButton = document.createElement('button');
     launcherButton.type = 'button';
     launcherButton.setAttribute('aria-label', 'Hermes (Ctrl+Shift+G)');
@@ -532,7 +581,6 @@ function initHermes() {
     launcherButton.appendChild(document.createTextNode('Hermes (Ctrl+Shift+G)'));
     launcherButton.addEventListener('click', onHermesClick);
 
-    hRoot.appendChild(hStyle);
     hRoot.appendChild(launcherButton);
     return hermesHost;
   }
@@ -560,97 +608,7 @@ function initHermes() {
     ].join('; ');
 
     var dRoot = dockHost.attachShadow({ mode: 'open' });
-    var dStyle = document.createElement('style');
-    dStyle.textContent = [
-      ':host {',
-      '  display: block;',
-      '  font: 12px/1.2 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;',
-      '  color: #202124;',
-      '}',
-      '.dock {',
-      '  box-sizing: border-box;',
-      '  width: 100%;',
-      '  background: #fff;',
-      '  border-top: 1px solid rgba(60,64,67,0.2);',
-      '  box-shadow: 0 -1px 4px rgba(60,64,67,0.12);',
-      '  padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));',
-      '  display: flex;',
-      '  flex-direction: column;',
-      '  gap: 6px;',
-      '}',
-      '.templatesRow {',
-      '  box-sizing: border-box;',
-      '  width: 100%;',
-      '  columns: 16rem;',
-      '  column-gap: 6px;',
-      '  column-fill: balance;',
-      '}',
-      '.templatesRow > .status {',
-      '  column-span: all;',
-      '  text-align: center;',
-      '}',
-      '.controlsRow {',
-      '  display: flex;',
-      '  flex-direction: row;',
-      '  flex-wrap: wrap;',
-      '  justify-content: center;',
-      '  align-items: center;',
-      '  gap: 6px;',
-      '}',
-      'button {',
-      '  font: inherit;',
-      '  line-height: 1.2;',
-        '  min-height: 28px;',
-        '  padding: 0 10px;',
-      '  color: #202124;',
-      '  background: #f1f3f4;',
-      '  border: 1px solid rgba(60,64,67,0.2);',
-        '  border-radius: 6px;',
-      '  cursor: default;',
-      '  user-select: none;',
-      '  -webkit-user-select: none;',
-      '}',
-      'button.templateChip {',
-      '  min-height: 24px;',
-      '  padding: 0 10px;',
-      '  border-radius: 9999px;',
-      '  background: #e8eaed;',
-      '  display: block;',
-      '  width: fit-content;',
-      '  max-width: 100%;',
-      '  break-inside: avoid;',
-      '  margin-bottom: 3px;',
-      '  text-align: left;',
-      '}',
-      'button.utility {',
-      '  background: #fff;',
-      '}',
-      '.category {',
-      '  display: inline-flex;',
-      '  align-items: center;',
-      '  gap: 6px;',
-      '  padding: 0 4px;',
-      '}',
-      '.categoryLabel {',
-      '  color: #5f6368;',
-      '  font-size: 12px;',
-      '}',
-      '.categorySelect {',
-      '  font: inherit;',
-      '  min-height: 32px;',
-      '  padding: 0 10px;',
-      '  background: #fff;',
-      '  border: 1px solid rgba(60,64,67,0.2);',
-      '  border-radius: 4px;',
-      '  color: #202124;',
-      '}',
-      '.status {',
-      '  color: #5f6368;',
-      '  font-size: 12px;',
-      '  padding: 0 4px;',
-      '}'
-    ].join('\n');
-    dRoot.appendChild(dStyle);
+    appendHermesStylesheet(dRoot);
     var dock = document.createElement('div');
     dock.className = 'dock';
 
@@ -661,6 +619,15 @@ function initHermes() {
     var controlsRow = document.createElement('div');
     controlsRow.className = 'controlsRow';
     dock.appendChild(controlsRow);
+
+    var shortcutsPanel = document.createElement('div');
+    shortcutsPanel.id = 'lichess-gmail-shortcuts-panel';
+    shortcutsPanel.className = 'shortcutsPanel';
+    shortcutsPanel.setAttribute('role', 'region');
+    shortcutsPanel.setAttribute('aria-label', 'Keyboard shortcuts');
+    if (!state.shortcutsVisible) shortcutsPanel.setAttribute('hidden', '');
+    fillShortcutsPanel(shortcutsPanel);
+    dock.appendChild(shortcutsPanel);
 
     dRoot.appendChild(dock);
     return dockHost;

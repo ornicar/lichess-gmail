@@ -1,10 +1,9 @@
 // Various helpers
-function getSenderEmail() {
-  return document.querySelector('tr.acZ span[email]').getAttribute('email');
-  // return document.querySelector('img.ajn[jid]').getAttribute('jid');
-}
+const getSenderEmail = () =>
+  document.querySelector('tr.acZ span[email]').getAttribute('email');
+// document.querySelector('img.ajn[jid]').getAttribute('jid');
 
-function clickReply() {
+const clickReply = () => {
   const replies = document.querySelectorAll('button[aria-label=Reply] span[jsname][aria-hidden=true]');
   if (replies.length > 0) replies[replies.length - 1].click();
 }
@@ -26,7 +25,7 @@ function sanitizeInjectedHtml(html) {
 
   var container = document.createElement('div');
   container.innerHTML = clean;
-  Array.from(container.querySelectorAll('a[href]')).forEach(function(link) {
+  Array.from(container.querySelectorAll('a[href]')).forEach((link) => {
     var href = (link.getAttribute('href') || '').trim();
     if (!/^(https?:|mailto:)/i.test(href)) {
       link.removeAttribute('href');
@@ -38,26 +37,23 @@ function sanitizeInjectedHtml(html) {
   return container.innerHTML;
 }
 
-function setReply(html) {
+const setReply = (html) => {
   document.querySelector('div.editable[id][contenteditable][g_editable]').innerHTML = sanitizeInjectedHtml(html);
-}
+};
 
-function insertSignature(html) {
-  var editable = document.activeElement && document.activeElement.closest
-    ? document.activeElement.closest('div[contenteditable="true"]')
-    : null;
-  if (!editable) editable = document.querySelector('div.editable[id][contenteditable][g_editable]');
+const insertSignature = (html) => {
+  var editable =
+    document.activeElement?.closest?.('div[contenteditable="true"]') ||
+    document.querySelector('div.editable[id][contenteditable][g_editable]');
   if (!editable) return;
   editable.focus();
   document.execCommand('insertHTML', false, sanitizeInjectedHtml(html));
-}
+};
 
-function setReplyEmail(email) {
-  var el = Array.from(document.querySelectorAll('form span')).find(
-    o => o.textContent === REPLY_SEND_AS_DISPLAY
-  );
+const setReplyEmail = (email) => {
+  var el = Array.from(document.querySelectorAll('form span')).find((o) => o.textContent === REPLY_SEND_AS_DISPLAY);
   if (el) el.innerHTML = email;
-}
+};
 
 // <https://stackoverflow.com/a/17644403>
 function copyTextToClipboard(html) {
@@ -87,7 +83,7 @@ function copyTextToClipboard(html) {
 }
 
 function confirmEmail(e) {
-  if (e && e.preventDefault) e.preventDefault();
+  e?.preventDefault?.();
   var email = getSenderEmail();
   window.open('https://lichess.org/mod/email-confirm?q=' + email);
   clickReply();
@@ -101,18 +97,16 @@ function confirmEmail(e) {
 }
 
 function searchSender(e) {
-  if (e && e.preventDefault) e.preventDefault();
+  e?.preventDefault?.();
   var email = getSenderEmail();
   window.open('https://lichess.org/mod/search?q=' + email);
 }
 
-function openProfileFromSelection(e) {
-  if (e && e.preventDefault) e.preventDefault();
-  var text = window.getSelection().toString();
-  if (!text) return;
-  var m = text.match(/[a-z0-9][\w-]*[a-z0-9]/i);
+const openProfileFromSelection = (e) => {
+  e?.preventDefault?.();
+  var m = window.getSelection().toString().match(/[a-z0-9][\w-]*[a-z0-9]/i);
   if (m) window.open('https://lichess.org/@/' + m[0] + '?mod');
-}
+};
 
 // Entry point for this script
 function load() {
@@ -142,15 +136,16 @@ function load() {
 function isGmailThreadViewFromUrl() {
   var h = (location.hash || '').replace(/^#/, '');
   if (!h) return false;
-  var parts = h.split('/').map(function (p) {
+  var parts = h.split('/').map((p) => {
     try { return decodeURIComponent(p); } catch (e) { return p; }
   });
   if (parts.length < 2) return false;
   var last = (parts[parts.length - 1] || '').trim();
-  if (last.length < 8) return false;
-  if (!/^[0-9A-Za-z_\-+]+$/.test(last)) return false;
-  if (/^(compose|p\d+)$/i.test(last)) return false;
-  return true;
+  return (
+    last.length >= 8 &&
+    /^[0-9A-Za-z_\-+]+$/.test(last) &&
+    !/^(compose|p\d+)$/i.test(last)
+  );
 }
 
 // Hermes UI: button + dock fixed to bottom of viewport
@@ -176,6 +171,9 @@ function initHermes() {
   };
   var selectedCategoryStorageKey = 'lichess-gmail.hermes.selectedCategory';
 
+  const normalizeCategory = (c) => typeof(c) === 'string' ? c.trim().toLowerCase() : '';
+  const formatCategoryLabel = (c) => (!c ? 'Uncategorized' : c.charAt(0).toUpperCase() + c.slice(1));
+
   function appendHermesStylesheet(shadowRoot) {
     var link = document.createElement('link');
     link.rel = 'stylesheet';
@@ -189,27 +187,15 @@ function initHermes() {
     if (savedCategory) state.selectedCategory = normalizeCategory(savedCategory) || 'all';
   } catch (e) {}
 
-  function normalizeCategory(c) {
-    if (typeof c !== 'string') return '';
-    return c.trim().toLowerCase();
-  }
-
-  function formatCategoryLabel(c) {
-    if (!c) return 'Uncategorized';
-    return c.charAt(0).toUpperCase() + c.slice(1);
-  }
-
   // Data and category management
   function recomputeCategories() {
     var previousCategory = state.selectedCategory;
     var seen = Object.create(null);
-    state.templates.forEach(function(t) {
+    state.templates.forEach((t) => {
       var k = normalizeCategory(t && t.category);
       if (k) seen[k] = true;
     });
-    state.categories = Object.keys(seen).sort(function(a, b) {
-      return a.localeCompare(b);
-    });
+    state.categories = Object.keys(seen).sort((a, b) => a.localeCompare(b));
     if (state.selectedCategory !== 'all' && state.categories.indexOf(state.selectedCategory) === -1) {
       state.selectedCategory = 'all';
     }
@@ -241,9 +227,8 @@ function initHermes() {
   }
 
   // Reply helpers
-  function getReplyEditable() {
-    return document.querySelector('div.editable[id][contenteditable][g_editable]');
-  }
+  const getReplyEditable = () =>
+    document.querySelector('div.editable[id][contenteditable][g_editable]');
 
   function withSignatureIfNeeded(template, done) {
     var body = (template && typeof template.body === 'string') ? template.body : '';
@@ -295,8 +280,7 @@ function initHermes() {
     if (!parts) return;
     var panel = parts.shortcutsPanel;
     if (panel) {
-      if (state.shortcutsVisible) panel.removeAttribute('hidden');
-      else panel.setAttribute('hidden', '');
+      state.shortcutsVisible ? panel.removeAttribute('hidden') : panel.setAttribute('hidden', '');
     }
     var btn = parts.controlsRow && parts.controlsRow.querySelector('#lichess-gmail-shortcuts-toggle');
     if (btn) {
@@ -311,7 +295,7 @@ function initHermes() {
     row.className = 'shortcutRow';
     var keys = document.createElement('span');
     keys.className = 'shortcutKeys';
-    keyLabels.forEach(function(label, i) {
+    keyLabels.forEach((label, i) => {
       if (i > 0) keys.appendChild(document.createTextNode(' or '));
       var kbd = document.createElement('kbd');
       kbd.appendChild(document.createTextNode(label));
@@ -409,7 +393,7 @@ function initHermes() {
     allOpt.appendChild(document.createTextNode('All'));
     select.appendChild(allOpt);
 
-    state.categories.forEach(function(c) {
+    state.categories.forEach((c) => {
       var opt = document.createElement('option');
       opt.value = c;
       opt.appendChild(document.createTextNode(formatCategoryLabel(c)));
@@ -427,10 +411,9 @@ function initHermes() {
     row.appendChild(wrap);
   }
 
-  function clearNode(n) {
-    if (!n) return;
-    while (n.firstChild) n.removeChild(n.firstChild);
-  }
+  const clearNode = (n) => {
+    while (n && n.firstChild) n.removeChild(n.firstChild);
+  };
 
   // Dock rendering
   function renderDock() {
@@ -469,10 +452,10 @@ function initHermes() {
       return;
     }
 
-    var filtered = state.templates.filter(function(t) {
-      if (state.selectedCategory === 'all') return true;
-      return normalizeCategory(t && t.category) === state.selectedCategory;
-    });
+    var filtered = state.templates.filter(
+      (t) =>
+        state.selectedCategory === 'all' || normalizeCategory(t && t.category) === state.selectedCategory
+    );
 
     if (!filtered.length) {
       var none = document.createElement('span');
@@ -482,7 +465,7 @@ function initHermes() {
       return;
     }
 
-    filtered.forEach(function(template) {
+    filtered.forEach((template) => {
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'templateChip';
@@ -492,7 +475,7 @@ function initHermes() {
       b.setAttribute('aria-label', name);
       b.setAttribute('title', name);
       b.appendChild(document.createTextNode(name));
-      b.addEventListener('click', function() {
+      b.addEventListener('click', () => {
         applyTemplateHtmlToReply(template);
       });
       parts.templatesRow.appendChild(b);
@@ -502,11 +485,11 @@ function initHermes() {
   // Template fetching lifecycle
   function fetchTemplatesAndRender() {
     return fetch(templatesApiUrl)
-      .then(function(res) {
+      .then((res) => {
         if (!res.ok) throw new Error('Bad status ' + res.status);
         return res.json();
       })
-      .then(function(payload) {
+      .then((payload) => {
         var next = payload && Array.isArray(payload.templates) ? payload.templates : [];
         state.templates = next;
         state.templatesLoaded = true;
@@ -514,7 +497,7 @@ function initHermes() {
         recomputeCategories();
         renderDock();
       })
-      .catch(function() {
+      .catch(() => {
         state.templatesLoaded = true;
         state.templatesLoadError = true;
         renderDock();
@@ -565,7 +548,7 @@ function initHermes() {
   }
 
   function toggleHermesEnabledWithShortcut(e) {
-    if (e && e.preventDefault) e.preventDefault();
+    e?.preventDefault?.();
     setHermesEnabled(!state.hermesEnabled);
   }
 

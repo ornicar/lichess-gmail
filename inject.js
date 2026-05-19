@@ -624,6 +624,7 @@ function initHermes() {
     hermesHost.setAttribute('aria-hidden', 'true');
     hermesHost.style.cssText = [
       'box-sizing: border-box',
+      'font: 12px/1.2 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif',
       'position: fixed',
       'z-index: 2147483647',
       'bottom: 0',
@@ -660,6 +661,7 @@ function initHermes() {
     dockHost.setAttribute('aria-hidden', 'true');
     dockHost.style.cssText = [
       'box-sizing: border-box',
+      'font: 12px/1.2 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif',
       'position: fixed',
       'z-index: 2147483646',
       'left: 0',

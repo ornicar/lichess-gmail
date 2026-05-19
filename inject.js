@@ -82,6 +82,12 @@ function insertIntoFocusedField(html) {
   return false;
 }
 
+function preventHermesControlFocusSteal(el) {
+  el.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+  });
+}
+
 const insertSignature = (html) => {
   if (isLinkedIn()) {
     insertIntoFocusedField(html);
@@ -381,6 +387,7 @@ function initHermes() {
     reload.className = 'utility';
     reload.setAttribute('aria-label', 'Reload templates');
     reload.appendChild(document.createTextNode('Reload'));
+    preventHermesControlFocusSteal(reload);
     reload.addEventListener('click', function() {
       state.templatesLoaded = false;
       state.templatesLoadError = false;
@@ -394,6 +401,7 @@ function initHermes() {
     edit.className = 'utility';
     edit.setAttribute('aria-label', 'Edit templates');
     edit.appendChild(document.createTextNode('Edit templates'));
+    preventHermesControlFocusSteal(edit);
     edit.addEventListener('click', function() {
       window.open('https://hermes.lichess.app/admin', '_blank', 'noopener,noreferrer');
     });
@@ -407,6 +415,7 @@ function initHermes() {
     shortcutsToggle.setAttribute('aria-controls', 'lichess-gmail-shortcuts-panel');
     shortcutsToggle.setAttribute('aria-label', 'Show or hide keyboard shortcuts');
     shortcutsToggle.appendChild(document.createTextNode('Shortcuts'));
+    preventHermesControlFocusSteal(shortcutsToggle);
     shortcutsToggle.addEventListener('click', function() {
       state.shortcutsVisible = !state.shortcutsVisible;
       syncShortcutsPanel(getDockParts());
@@ -420,6 +429,7 @@ function initHermes() {
     collapse.className = 'utility collapse';
     collapse.setAttribute('aria-label', 'Collapse Hermes tools (Ctrl+Shift+G)');
     collapse.appendChild(document.createTextNode('Collapse (Ctrl+Shift+G)'));
+    preventHermesControlFocusSteal(collapse);
     collapse.addEventListener('click', function() {
       setHermesEnabled(false);
     });
@@ -526,6 +536,7 @@ function initHermes() {
       b.setAttribute('aria-label', name);
       b.setAttribute('title', name);
       b.appendChild(document.createTextNode(name));
+      preventHermesControlFocusSteal(b);
       b.addEventListener('click', () => {
         applyTemplate(template);
       });
@@ -633,6 +644,7 @@ function initHermes() {
     launcherButton.setAttribute('aria-pressed', 'false');
     launcherButton.setAttribute('title', 'Turn Hermes message tools on or off (Ctrl+Shift+G)');
     launcherButton.appendChild(document.createTextNode('Hermes (Ctrl+Shift+G)'));
+    preventHermesControlFocusSteal(launcherButton);
     launcherButton.addEventListener('click', onHermesClick);
 
     hRoot.appendChild(launcherButton);

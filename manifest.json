@@ -31,15 +31,18 @@
     "storage",
     "tabs"
   ],
+  "host_permissions": [
+    "https://hermes.lichess.app/*"
+  ],
   "web_accessible_resources": [
     {
       "resources": ["styles.css"],
-      "matches": ["https://mail.google.com/*"]
+      "matches": ["https://mail.google.com/*", "https://www.linkedin.com/*", "https://linkedin.com/*"]
     }
   ],
   "content_scripts": [
     {
-      "matches": ["https://mail.google.com/mail/*"],
+      "matches": ["https://mail.google.com/mail/*", "https://www.linkedin.com/*", "https://linkedin.com/*"],
       "js": ["mousetrap.min.js", "dompurify.min.js", "common.js", "inject.js"]
     }
   ]

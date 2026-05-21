@@ -1,15 +1,9 @@
+// --- Platform ---
+
 const isGmail = () => /^https:\/\/mail\.google\.com\//i.test(location.href);
 const isLinkedIn = () => /^https:\/\/(www\.)?linkedin\.com\//i.test(location.href);
 
-// Various helpers
-const getSenderEmail = () =>
-  document.querySelector('tr.acZ span[email]').getAttribute('email');
-// document.querySelector('img.ajn[jid]').getAttribute('jid');
-
-const clickReply = () => {
-  const replies = document.querySelectorAll('button[aria-label=Reply] span[jsname][aria-hidden=true]');
-  if (replies.length > 0) replies[replies.length - 1].click();
-}
+// --- Shared helpers ---
 
 function sanitizeInjectedHtml(html) {
   var input = typeof html === 'string' ? html : '';
@@ -40,15 +34,121 @@ function sanitizeInjectedHtml(html) {
   return container.innerHTML;
 }
 
-const setReply = (html) => {
-  document.querySelector('div.editable[id][contenteditable][g_editable]').innerHTML = sanitizeInjectedHtml(html);
-};
-
 function htmlToPlainText(html) {
   var tmp = document.createElement('div');
   tmp.innerHTML = typeof html === 'string' ? html : '';
   return (tmp.textContent || tmp.innerText || '').replace(/\u00a0/g, ' ');
 }
+
+function preventHermesControlFocusSteal(el) {
+  el.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+  });
+}
+
+// --- Gmail helpers ---
+
+const getSenderEmail = () =>
+  document.querySelector('tr.acZ span[email]').getAttribute('email');
+// document.querySelector('img.ajn[jid]').getAttribute('jid');
+
+const clickReply = () => {
+  const replies = document.querySelectorAll('button[aria-label=Reply] span[jsname][aria-hidden=true]');
+  if (replies.length > 0) replies[replies.length - 1].click();
+};
+
+const setReply = (html) => {
+  document.querySelector('div.editable[id][contenteditable][g_editable]').innerHTML = sanitizeInjectedHtml(html);
+};
+
+const setReplyEmail = (email) => {
+  var el = Array.from(document.querySelectorAll('form span')).find((o) => o.textContent === REPLY_SEND_AS_DISPLAY);
+  if (el) el.innerHTML = email;
+};
+
+const insertSignature = (html) => {
+  if (isLinkedIn()) {
+    insertIntoFocusedField(html);
+    return;
+  }
+  var editable =
+    document.activeElement?.closest?.('div[contenteditable="true"]') ||
+    document.querySelector('div.editable[id][contenteditable][g_editable]');
+  if (!editable) return;
+  editable.focus();
+  document.execCommand('insertHTML', false, sanitizeInjectedHtml(html));
+};
+
+// <https://stackoverflow.com/a/17644403>
+function copyTextToClipboard(html) {
+  var tmpNode = document.createElement('div');
+  tmpNode.innerHTML = html;
+  document.body.appendChild(tmpNode);
+
+  var selection = window.getSelection();
+  var backupRange;
+  if (selection.rangeCount) backupRange = selection.getRangeAt(0).cloneRange();
+
+  var copyFrom = document.createRange();
+  copyFrom.selectNodeContents(tmpNode);
+  selection.removeAllRanges();
+  selection.addRange(copyFrom);
+  document.execCommand('copy');
+
+  tmpNode.parentNode.removeChild(tmpNode);
+
+  selection = window.getSelection();
+  selection.removeAllRanges();
+  if (backupRange) selection.addRange(backupRange);
+}
+
+function confirmEmail(e) {
+  e?.preventDefault?.();
+  var email = getSenderEmail();
+  window.open('https://lichess.org/mod/email-confirm?q=' + email);
+  clickReply();
+  extensionStorage().sync.get([SIGNATURE_STORAGE_KEY], function(data) {
+    var html = buildEmailConfirmedHtml(data[SIGNATURE_STORAGE_KEY]);
+    setTimeout(function() {
+      setReply(html);
+      setReplyEmail(REPLY_SEND_AS_EMAIL);
+    }, 100);
+  });
+}
+
+function searchSender(e) {
+  e?.preventDefault?.();
+  var email = getSenderEmail();
+  window.open('https://lichess.org/mod/search?q=' + email);
+}
+
+const openProfileFromSelection = (e) => {
+  e?.preventDefault?.();
+  var m = window.getSelection().toString().match(/[a-z0-9][\w-]*[a-z0-9]/i);
+  if (m) window.open('https://lichess.org/@/' + m[0] + '?mod');
+};
+
+/**
+ * Heuristic for an open message thread, based only on the location fragment (not Gmail
+ * HTML). Typical pattern: #label_or_box/threadId with a long opaque id as the last
+ * segment. Short two-segment paths (e.g. #search/term) are mostly excluded by length.
+ */
+function isGmailThreadViewFromUrl() {
+  var h = (location.hash || '').replace(/^#/, '');
+  if (!h) return false;
+  var parts = h.split('/').map((p) => {
+    try { return decodeURIComponent(p); } catch (e) { return p; }
+  });
+  if (parts.length < 2) return false;
+  var last = (parts[parts.length - 1] || '').trim();
+  return (
+    last.length >= 8 &&
+    /^[0-9A-Za-z_\-+]+$/.test(last) &&
+    !/^(compose|p\d+)$/i.test(last)
+  );
+}
+
+// --- LinkedIn helpers ---
 
 function isContentEditableElement(el) {
   if (!el || el.nodeType !== 1) return false;
@@ -140,84 +240,8 @@ function insertIntoFocusedField(html) {
   return false;
 }
 
-function preventHermesControlFocusSteal(el) {
-  el.addEventListener('mousedown', function(e) {
-    e.preventDefault();
-  });
-}
+// --- Entry point ---
 
-const insertSignature = (html) => {
-  if (isLinkedIn()) {
-    insertIntoFocusedField(html);
-    return;
-  }
-  var editable =
-    document.activeElement?.closest?.('div[contenteditable="true"]') ||
-    document.querySelector('div.editable[id][contenteditable][g_editable]');
-  if (!editable) return;
-  editable.focus();
-  document.execCommand('insertHTML', false, sanitizeInjectedHtml(html));
-};
-
-const setReplyEmail = (email) => {
-  var el = Array.from(document.querySelectorAll('form span')).find((o) => o.textContent === REPLY_SEND_AS_DISPLAY);
-  if (el) el.innerHTML = email;
-};
-
-// <https://stackoverflow.com/a/17644403>
-function copyTextToClipboard(html) {
-  var tmpNode = document.createElement('div');
-  tmpNode.innerHTML = html;
-  document.body.appendChild(tmpNode);
-
-  // Back up previous selection
-  var selection = window.getSelection();
-  var backupRange;
-  if (selection.rangeCount) backupRange = selection.getRangeAt(0).cloneRange();
-
-  // Copy the contents
-  var copyFrom = document.createRange();
-  copyFrom.selectNodeContents(tmpNode);
-  selection.removeAllRanges();
-  selection.addRange(copyFrom);
-  document.execCommand('copy');
-
-  // Clean-up
-  tmpNode.parentNode.removeChild(tmpNode);
-
-  // Restore selection
-  selection = window.getSelection();
-  selection.removeAllRanges();
-  if (backupRange) selection.addRange(backupRange);
-}
-
-function confirmEmail(e) {
-  e?.preventDefault?.();
-  var email = getSenderEmail();
-  window.open('https://lichess.org/mod/email-confirm?q=' + email);
-  clickReply();
-  extensionStorage().sync.get([SIGNATURE_STORAGE_KEY], function(data) {
-    var html = buildEmailConfirmedHtml(data[SIGNATURE_STORAGE_KEY]);
-    setTimeout(function() {
-      setReply(html);
-      setReplyEmail(REPLY_SEND_AS_EMAIL);
-    }, 100);
-  });
-}
-
-function searchSender(e) {
-  e?.preventDefault?.();
-  var email = getSenderEmail();
-  window.open('https://lichess.org/mod/search?q=' + email);
-}
-
-const openProfileFromSelection = (e) => {
-  e?.preventDefault?.();
-  var m = window.getSelection().toString().match(/[a-z0-9][\w-]*[a-z0-9]/i);
-  if (m) window.open('https://lichess.org/@/' + m[0] + '?mod');
-};
-
-// Entry point for this script
 function load() {
   initHermes();
 
@@ -239,27 +263,7 @@ function load() {
   Mousetrap.bind('ctrl+shift+f', openProfileFromSelection);
 }
 
-/**
- * Heuristic for an open message thread, based only on the location fragment (not Gmail
- * HTML). Typical pattern: #label_or_box/threadId with a long opaque id as the last
- * segment. Short two-segment paths (e.g. #search/term) are mostly excluded by length.
- */
-function isGmailThreadViewFromUrl() {
-  var h = (location.hash || '').replace(/^#/, '');
-  if (!h) return false;
-  var parts = h.split('/').map((p) => {
-    try { return decodeURIComponent(p); } catch (e) { return p; }
-  });
-  if (parts.length < 2) return false;
-  var last = (parts[parts.length - 1] || '').trim();
-  return (
-    last.length >= 8 &&
-    /^[0-9A-Za-z_\-+]+$/.test(last) &&
-    !/^(compose|p\d+)$/i.test(last)
-  );
-}
-
-// Hermes UI: button + dock fixed to bottom of viewport
+// --- Hermes UI: button + dock fixed to bottom of viewport ---
 function initHermes() {
   var hermesHostId = 'lichess-gmail-hermes-host';
   var dockHostId = 'lichess-gmail-hermes-dock';

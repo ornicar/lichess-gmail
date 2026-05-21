@@ -57,27 +57,85 @@ function isContentEditableElement(el) {
   return ce != null && ce !== 'false';
 }
 
+function findLinkedInComposeField(fromEl) {
+  if (fromEl && fromEl.nodeType === 1) {
+    var near =
+      fromEl.closest?.('.msg-form__contenteditable') ||
+      fromEl.closest?.('[contenteditable]:not([contenteditable="false"])');
+    if (isContentEditableElement(near)) return near;
+  }
+  var fields = document.querySelectorAll('.msg-form__contenteditable[contenteditable]');
+  for (var i = fields.length - 1; i >= 0; i--) {
+    if (fields[i].offsetParent !== null) return fields[i];
+  }
+  return fields[0] || null;
+}
+
+function insertHtmlIntoContentEditable(target, html) {
+  var clean = sanitizeInjectedHtml(html);
+  target.focus();
+  var sel = window.getSelection();
+  if (!sel) return false;
+
+  var range;
+  if (sel.rangeCount > 0 && target.contains(sel.anchorNode)) {
+    range = sel.getRangeAt(0);
+  } else {
+    range = document.createRange();
+    range.selectNodeContents(target);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  if (document.execCommand('insertHTML', false, clean)) {
+    target.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste' }));
+    return true;
+  }
+
+  range.deleteContents();
+  var holder = document.createElement('div');
+  holder.innerHTML = clean;
+  var lastInserted = null;
+  while (holder.firstChild) {
+    lastInserted = holder.firstChild;
+    range.insertNode(holder.firstChild);
+  }
+  if (lastInserted) {
+    range.setStartAfter(lastInserted);
+    range.collapse(true);
+  }
+  sel.removeAllRanges();
+  sel.addRange(range);
+  target.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste' }));
+  return true;
+}
+
 function insertIntoFocusedField(html) {
   var active = document.activeElement;
-  if (!active || active === document.body || active === document.documentElement) return false;
+  var target = null;
 
-  var editable = active.closest?.('[contenteditable]:not([contenteditable="false"])');
-  if (isContentEditableElement(editable) || isContentEditableElement(active)) {
-    var target = editable || active;
-    target.focus();
-    document.execCommand('insertHTML', false, sanitizeInjectedHtml(html));
-    return true;
+  if (active && active !== document.body && active !== document.documentElement) {
+    var editable = active.closest?.('[contenteditable]:not([contenteditable="false"])');
+    if (isContentEditableElement(editable)) target = editable;
+    else if (isContentEditableElement(active)) target = active;
+
+    if (
+      !target &&
+      active.matches?.('textarea, input[type="text"], input[type="search"], input:not([type])')
+    ) {
+      var text = htmlToPlainText(html);
+      var start = active.selectionStart ?? active.value.length;
+      var end = active.selectionEnd ?? start;
+      active.value = active.value.slice(0, start) + text + active.value.slice(end);
+      active.selectionStart = active.selectionEnd = start + text.length;
+      active.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      return true;
+    }
   }
 
-  if (active.matches?.('textarea, input[type="text"], input[type="search"], input:not([type])')) {
-    var text = htmlToPlainText(html);
-    var start = active.selectionStart ?? active.value.length;
-    var end = active.selectionEnd ?? start;
-    active.value = active.value.slice(0, start) + text + active.value.slice(end);
-    active.selectionStart = active.selectionEnd = start + text.length;
-    active.dispatchEvent(new InputEvent('input', { bubbles: true }));
-    return true;
-  }
+  if (!target && isLinkedIn()) target = findLinkedInComposeField(active);
+  if (target) return insertHtmlIntoContentEditable(target, html);
 
   return false;
 }

@@ -1,12 +1,9 @@
-// Various helpers
-const getSenderEmail = () =>
-  document.querySelector('tr.acZ span[email]').getAttribute('email');
-// document.querySelector('img.ajn[jid]').getAttribute('jid');
+// --- Platform ---
 
-const clickReply = () => {
-  const replies = document.querySelectorAll('button[aria-label=Reply] span[jsname][aria-hidden=true]');
-  if (replies.length > 0) replies[replies.length - 1].click();
-}
+const isGmail = () => /^https:\/\/mail\.google\.com\//i.test(location.href);
+const isLinkedIn = () => /^https:\/\/(www\.)?linkedin\.com\//i.test(location.href);
+
+// --- Shared helpers ---
 
 function sanitizeInjectedHtml(html) {
   var input = typeof html === 'string' ? html : '';
@@ -37,11 +34,43 @@ function sanitizeInjectedHtml(html) {
   return container.innerHTML;
 }
 
+function htmlToPlainText(html) {
+  var tmp = document.createElement('div');
+  tmp.innerHTML = typeof html === 'string' ? html : '';
+  return (tmp.textContent || tmp.innerText || '').replace(/\u00a0/g, ' ');
+}
+
+function preventHermesControlFocusSteal(el) {
+  el.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+  });
+}
+
+// --- Gmail helpers ---
+
+const getSenderEmail = () =>
+  document.querySelector('tr.acZ span[email]').getAttribute('email');
+// document.querySelector('img.ajn[jid]').getAttribute('jid');
+
+const clickReply = () => {
+  const replies = document.querySelectorAll('button[aria-label=Reply] span[jsname][aria-hidden=true]');
+  if (replies.length > 0) replies[replies.length - 1].click();
+};
+
 const setReply = (html) => {
   document.querySelector('div.editable[id][contenteditable][g_editable]').innerHTML = sanitizeInjectedHtml(html);
 };
 
+const setReplyEmail = (email) => {
+  var el = Array.from(document.querySelectorAll('form span')).find((o) => o.textContent === REPLY_SEND_AS_DISPLAY);
+  if (el) el.innerHTML = email;
+};
+
 const insertSignature = (html) => {
+  if (isLinkedIn()) {
+    insertIntoFocusedField(html);
+    return;
+  }
   var editable =
     document.activeElement?.closest?.('div[contenteditable="true"]') ||
     document.querySelector('div.editable[id][contenteditable][g_editable]');
@@ -50,33 +79,24 @@ const insertSignature = (html) => {
   document.execCommand('insertHTML', false, sanitizeInjectedHtml(html));
 };
 
-const setReplyEmail = (email) => {
-  var el = Array.from(document.querySelectorAll('form span')).find((o) => o.textContent === REPLY_SEND_AS_DISPLAY);
-  if (el) el.innerHTML = email;
-};
-
 // <https://stackoverflow.com/a/17644403>
 function copyTextToClipboard(html) {
   var tmpNode = document.createElement('div');
   tmpNode.innerHTML = html;
   document.body.appendChild(tmpNode);
 
-  // Back up previous selection
   var selection = window.getSelection();
   var backupRange;
   if (selection.rangeCount) backupRange = selection.getRangeAt(0).cloneRange();
 
-  // Copy the contents
   var copyFrom = document.createRange();
   copyFrom.selectNodeContents(tmpNode);
   selection.removeAllRanges();
   selection.addRange(copyFrom);
   document.execCommand('copy');
 
-  // Clean-up
   tmpNode.parentNode.removeChild(tmpNode);
 
-  // Restore selection
   selection = window.getSelection();
   selection.removeAllRanges();
   if (backupRange) selection.addRange(backupRange);
@@ -108,26 +128,6 @@ const openProfileFromSelection = (e) => {
   if (m) window.open('https://lichess.org/@/' + m[0] + '?mod');
 };
 
-// Entry point for this script
-function load() {
-  // Insert signature
-  Mousetrap.bind('ctrl+shift+e', function(e) {
-    e.preventDefault();
-    extensionStorage().sync.get([SIGNATURE_STORAGE_KEY], function(data) {
-      insertSignature(signatureToHtml(data[SIGNATURE_STORAGE_KEY]));
-    });
-  });
-  // Confirm email
-  Mousetrap.bind('ctrl+,', confirmEmail);
-  // Search for user by email
-  Mousetrap.bind('ctrl+y', searchSender);
-  Mousetrap.bind('ctrl+f', searchSender);
-  // Open profile for selected username
-  Mousetrap.bind('ctrl+shift+f', openProfileFromSelection);
-  // Initialize Hermes
-  initHermes();
-}
-
 /**
  * Heuristic for an open message thread, based only on the location fragment (not Gmail
  * HTML). Typical pattern: #label_or_box/threadId with a long opaque id as the last
@@ -148,11 +148,125 @@ function isGmailThreadViewFromUrl() {
   );
 }
 
-// Hermes UI: button + dock fixed to bottom of viewport
+// --- LinkedIn helpers ---
+
+function isContentEditableElement(el) {
+  if (!el || el.nodeType !== 1) return false;
+  if (el.isContentEditable) return true;
+  var ce = el.getAttribute?.('contenteditable');
+  return ce != null && ce !== 'false';
+}
+
+function findLinkedInComposeField(fromEl) {
+  if (fromEl && fromEl.nodeType === 1) {
+    var near =
+      fromEl.closest?.('.msg-form__contenteditable') ||
+      fromEl.closest?.('[contenteditable]:not([contenteditable="false"])');
+    if (isContentEditableElement(near)) return near;
+  }
+  var fields = document.querySelectorAll('.msg-form__contenteditable[contenteditable]');
+  for (var i = fields.length - 1; i >= 0; i--) {
+    if (fields[i].offsetParent !== null) return fields[i];
+  }
+  return fields[0] || null;
+}
+
+function insertHtmlIntoContentEditable(target, html) {
+  var clean = sanitizeInjectedHtml(html);
+  target.focus();
+  var sel = window.getSelection();
+  if (!sel) return false;
+
+  var range;
+  if (sel.rangeCount > 0 && target.contains(sel.anchorNode)) {
+    range = sel.getRangeAt(0);
+  } else {
+    range = document.createRange();
+    range.selectNodeContents(target);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  if (document.execCommand('insertHTML', false, clean)) {
+    target.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste' }));
+    return true;
+  }
+
+  range.deleteContents();
+  var holder = document.createElement('div');
+  holder.innerHTML = clean;
+  var lastInserted = null;
+  while (holder.firstChild) {
+    lastInserted = holder.firstChild;
+    range.insertNode(holder.firstChild);
+  }
+  if (lastInserted) {
+    range.setStartAfter(lastInserted);
+    range.collapse(true);
+  }
+  sel.removeAllRanges();
+  sel.addRange(range);
+  target.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste' }));
+  return true;
+}
+
+function insertIntoFocusedField(html) {
+  var active = document.activeElement;
+  var target = null;
+
+  if (active && active !== document.body && active !== document.documentElement) {
+    var editable = active.closest?.('[contenteditable]:not([contenteditable="false"])');
+    if (isContentEditableElement(editable)) target = editable;
+    else if (isContentEditableElement(active)) target = active;
+
+    if (
+      !target &&
+      active.matches?.('textarea, input[type="text"], input[type="search"], input:not([type])')
+    ) {
+      var text = htmlToPlainText(html);
+      var start = active.selectionStart ?? active.value.length;
+      var end = active.selectionEnd ?? start;
+      active.value = active.value.slice(0, start) + text + active.value.slice(end);
+      active.selectionStart = active.selectionEnd = start + text.length;
+      active.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      return true;
+    }
+  }
+
+  if (!target && isLinkedIn()) target = findLinkedInComposeField(active);
+  if (target) return insertHtmlIntoContentEditable(target, html);
+
+  return false;
+}
+
+// --- Entry point ---
+
+function load() {
+  initHermes();
+
+  if (!isGmail()) return;
+
+  // Insert signature
+  Mousetrap.bind('ctrl+shift+e', function(e) {
+    e.preventDefault();
+    extensionStorage().sync.get([SIGNATURE_STORAGE_KEY], function(data) {
+      insertSignature(signatureToHtml(data[SIGNATURE_STORAGE_KEY]));
+    });
+  });
+  // Confirm email
+  Mousetrap.bind('ctrl+,', confirmEmail);
+  // Search for user by email
+  Mousetrap.bind('ctrl+y', searchSender);
+  Mousetrap.bind('ctrl+f', searchSender);
+  // Open profile for selected username
+  Mousetrap.bind('ctrl+shift+f', openProfileFromSelection);
+}
+
+// --- Hermes UI: button + dock fixed to bottom of viewport ---
 function initHermes() {
   var hermesHostId = 'lichess-gmail-hermes-host';
   var dockHostId = 'lichess-gmail-hermes-dock';
-  var templatesApiUrl = 'https://hermes.lichess.app/api/templates';
   var templatesRefreshMs = 6 * 60 * 60 * 1000; // 6 hours
   if (document.getElementById(hermesHostId)) return;
 
@@ -242,8 +356,13 @@ function initHermes() {
     });
   }
 
-  function applyTemplateHtmlToReply(template) {
+  function applyTemplate(template) {
     withSignatureIfNeeded(template, function(html) {
+      if (isLinkedIn()) {
+        insertIntoFocusedField(html);
+        return;
+      }
+
       var editable = getReplyEditable();
       if (editable) {
         setReply(html);
@@ -330,6 +449,7 @@ function initHermes() {
     reload.className = 'utility';
     reload.setAttribute('aria-label', 'Reload templates');
     reload.appendChild(document.createTextNode('Reload'));
+    preventHermesControlFocusSteal(reload);
     reload.addEventListener('click', function() {
       state.templatesLoaded = false;
       state.templatesLoadError = false;
@@ -343,6 +463,7 @@ function initHermes() {
     edit.className = 'utility';
     edit.setAttribute('aria-label', 'Edit templates');
     edit.appendChild(document.createTextNode('Edit templates'));
+    preventHermesControlFocusSteal(edit);
     edit.addEventListener('click', function() {
       window.open('https://hermes.lichess.app/admin', '_blank', 'noopener,noreferrer');
     });
@@ -356,6 +477,7 @@ function initHermes() {
     shortcutsToggle.setAttribute('aria-controls', 'lichess-gmail-shortcuts-panel');
     shortcutsToggle.setAttribute('aria-label', 'Show or hide keyboard shortcuts');
     shortcutsToggle.appendChild(document.createTextNode('Shortcuts'));
+    preventHermesControlFocusSteal(shortcutsToggle);
     shortcutsToggle.addEventListener('click', function() {
       state.shortcutsVisible = !state.shortcutsVisible;
       syncShortcutsPanel(getDockParts());
@@ -369,6 +491,7 @@ function initHermes() {
     collapse.className = 'utility collapse';
     collapse.setAttribute('aria-label', 'Collapse Hermes tools (Ctrl+Shift+G)');
     collapse.appendChild(document.createTextNode('Collapse (Ctrl+Shift+G)'));
+    preventHermesControlFocusSteal(collapse);
     collapse.addEventListener('click', function() {
       setHermesEnabled(false);
     });
@@ -475,21 +598,21 @@ function initHermes() {
       b.setAttribute('aria-label', name);
       b.setAttribute('title', name);
       b.appendChild(document.createTextNode(name));
+      preventHermesControlFocusSteal(b);
       b.addEventListener('click', () => {
-        applyTemplateHtmlToReply(template);
+        applyTemplate(template);
       });
       parts.templatesRow.appendChild(b);
     });
   }
 
-  // Template fetching lifecycle
+  // Template fetching lifecycle (background worker bypasses page CSP)
   function fetchTemplatesAndRender() {
-    return fetch(templatesApiUrl)
-      .then((res) => {
-        if (!res.ok) throw new Error('Bad status ' + res.status);
-        return res.json();
-      })
-      .then((payload) => {
+    return extensionRuntime()
+      .sendMessage({ type: 'hermesFetchTemplates' })
+      .then((response) => {
+        if (!response || !response.ok) throw new Error((response && response.error) || 'fetch failed');
+        var payload = response.payload;
         var next = payload && Array.isArray(payload.templates) ? payload.templates : [];
         state.templates = next;
         state.templatesLoaded = true;
@@ -509,22 +632,26 @@ function initHermes() {
     state.templatesRefreshId = setInterval(fetchTemplatesAndRender, templatesRefreshMs);
   }
 
+  function hermesContextActive() {
+    return isLinkedIn() || isGmailThreadViewFromUrl();
+  }
+
   // Visibility, toggle, and navigation events
   function updateThreadDock() {
     var dock = document.getElementById(dockHostId);
     if (!dock) return;
-    var isThreadView = isGmailThreadViewFromUrl();
-    var on = state.hermesEnabled && isThreadView;
+    var contextActive = hermesContextActive();
+    var on = state.hermesEnabled && contextActive;
     dock.style.display = on ? 'block' : 'none';
     dock.setAttribute('aria-hidden', on ? 'false' : 'true');
-    updateHermesLauncherVisibility(isThreadView);
+    updateHermesLauncherVisibility(contextActive);
   }
 
-  function updateHermesLauncherVisibility(isThreadView) {
+  function updateHermesLauncherVisibility(contextActive) {
     var h = document.getElementById(hermesHostId);
     if (!h) return;
-    var threadView = typeof isThreadView === 'boolean' ? isThreadView : isGmailThreadViewFromUrl();
-    var showLauncher = threadView && !state.hermesEnabled;
+    var active = typeof contextActive === 'boolean' ? contextActive : hermesContextActive();
+    var showLauncher = active && !state.hermesEnabled;
     h.style.display = showLauncher ? 'block' : 'none';
     h.setAttribute('aria-hidden', showLauncher ? 'false' : 'true');
   }
@@ -538,7 +665,7 @@ function initHermes() {
       if (b) b.setAttribute('aria-pressed', state.hermesEnabled ? 'true' : 'false');
     }
     updateHermesLauncherVisibility();
-    if (state.hermesEnabled) startUrlPoll();
+    if (state.hermesEnabled && isGmail()) startUrlPoll();
     else stopUrlPoll();
     updateThreadDock();
   }
@@ -559,6 +686,7 @@ function initHermes() {
     hermesHost.setAttribute('aria-hidden', 'true');
     hermesHost.style.cssText = [
       'box-sizing: border-box',
+      'font: 12px/1.2 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif',
       'position: fixed',
       'z-index: 2147483647',
       'bottom: 0',
@@ -579,6 +707,7 @@ function initHermes() {
     launcherButton.setAttribute('aria-pressed', 'false');
     launcherButton.setAttribute('title', 'Turn Hermes message tools on or off (Ctrl+Shift+G)');
     launcherButton.appendChild(document.createTextNode('Hermes (Ctrl+Shift+G)'));
+    preventHermesControlFocusSteal(launcherButton);
     launcherButton.addEventListener('click', onHermesClick);
 
     hRoot.appendChild(launcherButton);
@@ -590,10 +719,11 @@ function initHermes() {
     dockHost.id = dockHostId;
     dockHost.setAttribute('data-lichess-gmail', 'hermes-dock');
     dockHost.setAttribute('role', 'region');
-    dockHost.setAttribute('aria-label', 'Hermes thread tools');
+    dockHost.setAttribute('aria-label', isLinkedIn() ? 'Hermes message tools' : 'Hermes thread tools');
     dockHost.setAttribute('aria-hidden', 'true');
     dockHost.style.cssText = [
       'box-sizing: border-box',
+      'font: 12px/1.2 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif',
       'position: fixed',
       'z-index: 2147483646',
       'left: 0',

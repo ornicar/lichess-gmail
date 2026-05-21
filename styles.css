@@ -1,6 +1,15 @@
 /* Hermes launcher — shadow host #lichess-gmail-hermes-host */
 :host(#lichess-gmail-hermes-host) {
   display: block;
+  box-sizing: border-box;
+  font-size: 12px;
+  line-height: 1.2;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #202124;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  -webkit-text-size-adjust: none;
 
   button {
     font: 12px/1.2 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -51,8 +60,21 @@
 /* Hermes dock — shadow host #lichess-gmail-hermes-dock */
 :host(#lichess-gmail-hermes-dock) {
   display: block;
-  font: 12px/1.2 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  box-sizing: border-box;
+  font-size: 12px;
+  line-height: 1.2;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: #202124;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
 
   .dock {
     box-sizing: border-box;
@@ -69,7 +91,7 @@
   .templatesRow {
     box-sizing: border-box;
     width: 100%;
-    columns: 16rem;
+    columns: 256px;
     column-gap: 6px;
     column-fill: balance;
 
@@ -89,7 +111,9 @@
   }
 
   button {
-    font: inherit;
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: normal;
     line-height: 1.2;
     min-height: 28px;
     padding: 0 10px;
@@ -164,7 +188,9 @@
   }
 
   .categorySelect {
-    font: inherit;
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: normal;
     min-height: 32px;
     padding: 0 10px;
     background: #fff;
@@ -225,7 +251,7 @@
 
   .shortcutKeys {
     flex: 0 0 auto;
-    min-width: 10.5rem;
+    min-width: 168px;
 
     kbd {
       font: 11px/1.2 ui-monospace, Menlo, Consolas, monospace;
@@ -238,7 +264,7 @@
   }
 
   .shortcutDesc {
-    flex: 1 1 12rem;
+    flex: 1 1 192px;
     color: #5f6368;
     font-size: 12px;
   }
